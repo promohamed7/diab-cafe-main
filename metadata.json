@@ -1,0 +1,7 @@
+{
+  "name": "Diab Cafe",
+  "description": "Artisanal coffee roastery and ordering platform for Diab Cafe in Sidi Salem. Features dine-in QR ordering, takeaway pickup, home delivery, live order tracking, and roastery store.",
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
