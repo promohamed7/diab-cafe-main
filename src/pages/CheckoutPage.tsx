@@ -1,446 +1,373 @@
 import React, { useState } from 'react';
-import { useStore } from '../context/StoreContext';
-import { formatEGP } from '../data/menuData';
+import { useUI } from '../context/UIContext';
+import { useCart } from '../hooks/useCart';
+import { useCatalog } from '../hooks/useCatalog';
+import { useOrderContext } from '../hooks/useOrderContext';
+import type { CheckoutPhase, SubmitBlocker } from '../hooks/useCheckout';
+import { formFromAttempt, useCheckout } from '../hooks/useCheckout';
+import type { CheckoutField, CheckoutFormInput } from '../domain/customer';
+import { LIMITS } from '../domain/customer';
+import { findOption } from '../domain/catalogIndex';
+import { formatMoney } from '../domain/pricing';
+import { ORDER_STATUS_PRESENTATION, ORDER_TYPE_LABELS, paymentMethodLabel } from '../domain/orderStatus';
+import { CUSTOMER_ERROR_MESSAGES } from '../integration/errors';
+import type { PaymentMethod } from '../types/order';
+
+const BLOCKER_TEXT: Record<SubmitBlocker, string> = {
+  CART_EMPTY: 'السلة فارغة.',
+  CART_HAS_ISSUES: 'بعض الأصناف في السلة تحتاج للمراجعة قبل الإرسال.',
+  MENU_NOT_LOADED: 'لم يتم تحميل المنيو من الكافيه بعد. حاول بعد لحظات.',
+  TABLE_REQUIRED: 'الطلب من الطاولة يحتاج مسح كود QR الموجود على طاولتك.',
+  TABLE_EXPIRED: 'انتهت جلسة الطاولة. امسح كود QR الموجود على طاولتك مرة أخرى.',
+  BUSY: 'جارٍ إرسال طلبك بالفعل...'
+};
+
+/** Phases where the customer must change something before sending again. */
+const NEEDS_CART_REVIEW: ReadonlySet<CheckoutPhase> = new Set<CheckoutPhase>([
+  'PRICE_CHANGED',
+  'OUT_OF_STOCK',
+  'PRODUCT_UNAVAILABLE',
+  'INVALID_MODIFIER'
+]);
+
+const EMPTY_FORM: CheckoutFormInput = { fullName: '', phone: '', deliveryAddress: '', notes: '', paymentMethod: 'CASH' };
 
 export const CheckoutPage: React.FC = () => {
-  const {
-    orderMode,
-    tableNumber,
-    cart,
-    cartTotalCents,
-    user,
-    submitOrder,
-    setActiveTab,
-    openTableModal,
-    showToast
-  } = useStore();
+  const { setActiveTab, showToast } = useUI();
+  const cart = useCart();
+  const { index } = useCatalog();
+  const { orderType, table } = useOrderContext();
+  const checkout = useCheckout();
+  const { state } = checkout;
 
-  const [fullName, setFullName] = useState(user?.name || 'أحمد محمود');
-  const [phone, setPhone] = useState(user?.phone || '01012345678');
-  const [notes, setNotes] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'VODAFONE_CASH' | 'CARD'>('CASH');
+  const [form, setForm] = useState<CheckoutFormInput>(() => formFromAttempt(checkout.attempt, 'CASH') ?? EMPTY_FORM);
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<CheckoutField, string>>>({});
+  const [blocker, setBlocker] = useState<SubmitBlocker | null>(null);
 
-  // Delivery address
-  const defaultAddr = user?.savedAddresses?.find((a) => a.isDefault) || user?.savedAddresses?.[0];
-  const [selectedAddressId, setSelectedAddressId] = useState<string>(defaultAddr?.id || 'manual');
-  const [manualAddress, setManualAddress] = useState(
-    defaultAddr ? `${defaultAddr.city} — ${defaultAddr.street} ${defaultAddr.building || ''}` : ''
-  );
+  const update = <K extends keyof CheckoutFormInput>(key: K, value: CheckoutFormInput[K]) => {
+    setForm((f) => ({ ...f, [key]: value }));
+    setFieldErrors((e) => ({ ...e, [key]: undefined }));
+  };
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const deliveryFeeCents = orderMode === 'DELIVERY' ? 2500 : 0;
-  const grandTotalCents = cartTotalCents + deliveryFeeCents;
+  const submitting = state.phase === 'SUBMITTING';
+  const contactRequired = orderType !== 'DINE_IN';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fullName.trim()) {
-      showToast('يرجى إدخال اسم العميل');
-      return;
-    }
-    if (!phone.trim() || phone.length < 10) {
-      showToast('يرجى إدخال رقم هاتف صحيح');
-      return;
-    }
-
-    let finalAddress = '';
-    if (orderMode === 'DELIVERY') {
-      if (selectedAddressId !== 'manual') {
-        const found = user?.savedAddresses?.find((a) => a.id === selectedAddressId);
-        finalAddress = found ? `${found.city} — ${found.street} ${found.building || ''}` : manualAddress;
-      } else {
-        finalAddress = manualAddress;
-      }
-      if (!finalAddress.trim()) {
-        showToast('يرجى تحديد أو إدخال عنوان التوصيل');
-        return;
-      }
-    }
-
-    setIsSubmitting(true);
-    try {
-      await submitOrder({
-        fullName,
-        phone,
-        deliveryAddress: orderMode === 'DELIVERY' ? finalAddress : undefined,
-        customerNotes: notes,
-        paymentMethod
-      });
-      setActiveTab('order');
-    } catch {
-      showToast('حدث خطأ أثناء إرسال الطلب، يرجى المحاولة مرة أخرى.');
-    } finally {
-      setIsSubmitting(false);
-    }
+    if (submitting) return;
+    setBlocker(null);
+    const result = await checkout.submit(form);
+    setFieldErrors(result.fieldErrors);
+    setBlocker(result.blocker);
+    if (Object.keys(result.fieldErrors).length > 0) showToast('يرجى مراجعة البيانات المطلوبة.', 'error');
   };
+
+  // ---------------- Confirmation (Café acknowledged the order) ----------------
+  if ((state.phase === 'RECEIVED' || state.phase === 'SUCCESS') && state.acknowledgement && state.trackedOrder) {
+    const ack = state.acknowledgement;
+    const status = ORDER_STATUS_PRESENTATION[ack.orderStatus];
+    return (
+      <main className="page-content" style={{ paddingBottom: '6rem' }}>
+        <div className="content-inner">
+          <section className="checkout-result-card is-success" id="order-confirmation" aria-live="polite">
+            <span className="material-symbols-outlined checkout-result-icon" aria-hidden="true">mark_email_read</span>
+            <h1>وصل طلبك إلى الكافيه</h1>
+            <p className="checkout-result-sub">{status.description}</p>
+
+            <dl className="checkout-result-facts">
+              <div>
+                <dt>رقم الطلب</dt>
+                <dd id="confirmation-order-number">{ack.orderNumber}</dd>
+              </div>
+              <div>
+                <dt>الحالة</dt>
+                <dd id="confirmation-order-status">{status.label}</dd>
+              </div>
+              <div>
+                <dt>الإجمالي (من الكافيه)</dt>
+                <dd id="confirmation-total">{formatMoney(ack.totalCents)}</dd>
+              </div>
+              <div>
+                <dt>طريقة الدفع</dt>
+                <dd>{paymentMethodLabel(state.trackedOrder.paymentMethod, state.trackedOrder.orderType)}</dd>
+              </div>
+              {state.trackedOrder.tableLabel && (
+                <div>
+                  <dt>الطاولة</dt>
+                  <dd>{state.trackedOrder.tableLabel}</dd>
+                </div>
+              )}
+            </dl>
+            {ack.replayed && (
+              <p className="summary-note">تم التأكد من أن طلبك وصل مرة واحدة فقط — لم يتم تكراره.</p>
+            )}
+
+            <button type="button" className="btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={() => setActiveTab('order')}>
+              <span>تتبع حالة الطلب</span>
+              <span className="material-symbols-outlined">near_me</span>
+            </button>
+            <button
+              type="button"
+              className="btn-secondary"
+              style={{ width: '100%', justifyContent: 'center' }}
+              onClick={() => {
+                checkout.resetToIdle();
+                setForm(EMPTY_FORM);
+                setActiveTab('menu');
+              }}
+            >
+              <span>طلب جديد من المنيو</span>
+            </button>
+          </section>
+        </div>
+      </main>
+    );
+  }
+
+  if (cart.itemCount === 0 && !checkout.hasUnresolvedAttempt) {
+    return (
+      <main className="page-content">
+        <div className="content-inner">
+          <div className="catalog-state-card">
+            <span className="material-symbols-outlined catalog-state-icon" aria-hidden="true">shopping_bag</span>
+            <h2>السلة فارغة</h2>
+            <button type="button" className="btn-primary" onClick={() => setActiveTab('menu')}>
+              <span>تصفح المنيو</span>
+            </button>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  const errorPhase = !['IDLE', 'SUBMITTING', 'RECEIVED', 'SUCCESS'].includes(state.phase);
+  const showUnresolvedBanner = checkout.hasUnresolvedAttempt && !submitting;
 
   return (
     <main className="page-content" style={{ paddingBottom: '6rem' }}>
       <div className="content-inner">
-        {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <h1 style={{ fontSize: '20px', fontWeight: 800 }}>إتمام وتأكيد الطلب</h1>
             <p style={{ fontSize: '12px', color: 'var(--on-surface-variant)', marginTop: '2px' }}>
-              أدخل بياناتك لتأكيد طلبك وتوجيهه للباريستا فوراً
+              سيصل طلبك للكافيه للمراجعة والتأكيد
             </p>
           </div>
-          <button
-            type="button"
-            style={{ fontSize: '12px', color: 'var(--primary)', fontWeight: 700 }}
-            onClick={() => setActiveTab('cart')}
-          >
+          <button type="button" style={{ fontSize: '12px', color: 'var(--primary)', fontWeight: 700 }} onClick={() => setActiveTab('cart')}>
             ← العودة للسلة
           </button>
         </div>
 
-        {/* Order Mode Info */}
-        <div
-          style={{
-            background: 'var(--surface-container-high)',
-            border: '1px solid rgba(244, 189, 97, 0.25)',
-            borderRadius: '16px',
-            padding: '0.85rem 1rem',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-            <span className="material-symbols-outlined" style={{ color: 'var(--primary)', fontSize: '22px' }}>
-              {orderMode === 'DINE_IN' ? 'table_restaurant' : orderMode === 'PICKUP' ? 'store' : 'two_wheeler'}
+        {/* Order type (read-only here) */}
+        <div style={{ background: 'var(--surface-container-high)', border: '1px solid rgba(244, 189, 97, 0.25)', borderRadius: '16px', padding: '0.85rem 1rem', display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+          <span className="material-symbols-outlined" style={{ color: 'var(--primary)', fontSize: '22px' }}>
+            {orderType === 'DINE_IN' ? 'table_restaurant' : orderType === 'PICKUP' ? 'store' : 'two_wheeler'}
+          </span>
+          <div>
+            <span style={{ fontSize: '13.5px', fontWeight: 700 }} id="checkout-order-type">
+              {orderType === 'DINE_IN' && table ? `${ORDER_TYPE_LABELS.DINE_IN} — ${table.tableLabel}` : ORDER_TYPE_LABELS[orderType]}
             </span>
-            <div>
-              <span style={{ fontSize: '13.5px', fontWeight: 700 }}>
-                {orderMode === 'DINE_IN'
-                  ? `طلب داخل الفرع — طاولة ${tableNumber}`
-                  : orderMode === 'PICKUP'
-                  ? 'استلام سريع من الفرع (تيك أواي)'
-                  : 'توصيل دليفري منزلي'}
-              </span>
-              <span style={{ fontSize: '11px', color: 'var(--on-surface-variant)', display: 'block' }}>
-                {orderMode === 'DINE_IN'
-                  ? 'يصل الطلب لطاولتك مع الباريستا'
-                  : orderMode === 'PICKUP'
-                  ? 'جاهز للاستلام خلال 10-15 دقيقة'
-                  : 'تغطية سيدي سالم وكفر الشيخ خلال 25-35 دقيقة'}
-              </span>
-            </div>
+            <span style={{ fontSize: '11px', color: 'var(--on-surface-variant)', display: 'block' }}>
+              {orderType === 'DINE_IN'
+                ? 'يصل طلبك لفريق الكافيه مرتبطاً بطاولتك'
+                : orderType === 'PICKUP'
+                ? 'استلم طلبك من الفرع بعد تأكيده'
+                : 'يتواصل معك الكافيه لتأكيد التوصيل'}
+            </span>
           </div>
-          {orderMode === 'DINE_IN' && (
-            <button
-              type="button"
-              style={{
-                fontSize: '11.5px',
-                color: 'var(--primary)',
-                fontWeight: 700,
-                background: 'rgba(200,150,62,0.15)',
-                padding: '0.3rem 0.75rem',
-                borderRadius: '9999px',
-                border: '1px solid rgba(200,150,62,0.3)'
-              }}
-              onClick={openTableModal}
-            >
-              تغيير الطاولة
-            </button>
-          )}
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          {/* Customer Details Box */}
+        {showUnresolvedBanner && (
           <div
-            style={{
-              background: 'var(--surface-container)',
-              border: '1px solid rgba(255,255,255,0.08)',
-              borderRadius: '20px',
-              padding: '1.25rem',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '0.85rem'
-            }}
+            className="checkout-status-panel is-warning"
+            role="alert"
+            id="unresolved-attempt-banner"
+            data-phase={state.phase}
+            data-request-id={checkout.attempt?.clientRequestId ?? ''}
           >
-            <h3 style={{ fontSize: '15px', fontWeight: 800, color: 'var(--on-surface)' }}>بيانات العميل:</h3>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
-                الاسم بالكامل *
-              </label>
-              <input
-                type="text"
-                className="checkout-input"
-                placeholder="أحمد محمود"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                required
-                style={{ width: '100%' }}
-              />
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
-                رقم الهاتف المحمول للتأكيد والمتابعة *
-              </label>
-              <input
-                type="tel"
-                className="checkout-input"
-                placeholder="01012345678"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                required
-                style={{ width: '100%', direction: 'ltr', textAlign: 'right' }}
-              />
-            </div>
-
-            {/* Delivery address selector if mode is DELIVERY */}
-            {orderMode === 'DELIVERY' && (
-              <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                  عنوان التوصيل في سيدي سالم أو كفر الشيخ *
-                </label>
-
-                {user?.savedAddresses && user.savedAddresses.length > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '0.75rem' }}>
-                    {user.savedAddresses.map((addr) => (
-                      <label
-                        key={addr.id}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.65rem',
-                          background: selectedAddressId === addr.id ? 'rgba(200,150,62,0.15)' : 'rgba(255,255,255,0.02)',
-                          border: selectedAddressId === addr.id ? '1px solid var(--primary)' : '1px solid rgba(255,255,255,0.06)',
-                          borderRadius: '12px',
-                          padding: '0.65rem 0.85rem',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        <input
-                          type="radio"
-                          name="addressGroup"
-                          checked={selectedAddressId === addr.id}
-                          onChange={() => setSelectedAddressId(addr.id)}
-                        />
-                        <div>
-                          <span style={{ fontSize: '12.5px', fontWeight: 700 }}>{addr.label}</span>
-                          <span style={{ fontSize: '11px', color: 'var(--on-surface-variant)', display: 'block' }}>
-                            {addr.city} — {addr.street} {addr.building || ''}
-                          </span>
-                        </div>
-                      </label>
-                    ))}
-                    <label
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.65rem',
-                        background: selectedAddressId === 'manual' ? 'rgba(200,150,62,0.15)' : 'rgba(255,255,255,0.02)',
-                        border: selectedAddressId === 'manual' ? '1px solid var(--primary)' : '1px solid rgba(255,255,255,0.06)',
-                        borderRadius: '12px',
-                        padding: '0.65rem 0.85rem',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      <input
-                        type="radio"
-                        name="addressGroup"
-                        checked={selectedAddressId === 'manual'}
-                        onChange={() => setSelectedAddressId('manual')}
-                      />
-                      <span style={{ fontSize: '12.5px', fontWeight: 600 }}>عنوان آخر جديد</span>
-                    </label>
-                  </div>
-                )}
-
-                {(selectedAddressId === 'manual' || !user?.savedAddresses?.length) && (
-                  <textarea
-                    className="checkout-input"
-                    placeholder="مثال: سيدي سالم، شارع المحكمة، أمام بنك مصر، عمارة ٤ الدور الثاني"
-                    value={manualAddress}
-                    onChange={(e) => setManualAddress(e.target.value)}
-                    rows={2}
-                    style={{ width: '100%', height: 'auto', padding: '0.65rem' }}
-                    required={orderMode === 'DELIVERY'}
-                  />
-                )}
-              </div>
-            )}
-
-            <div>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
-                ملاحظات خاصة للباريستا أو الدليفري (اختياري)
-              </label>
-              <input
-                type="text"
-                className="checkout-input"
-                placeholder="مثال: زيادة ثلج، تحميص غامق، السكر في كوب خارجي..."
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                style={{ width: '100%' }}
-              />
-            </div>
-          </div>
-
-          {/* Payment Method Selector */}
-          <div
-            style={{
-              background: 'var(--surface-container)',
-              border: '1px solid rgba(255,255,255,0.08)',
-              borderRadius: '20px',
-              padding: '1.25rem',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '0.85rem'
-            }}
-          >
-            <h3 style={{ fontSize: '15px', fontWeight: 800 }}>طريقة الدفع:</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <label
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '0.75rem 1rem',
-                  borderRadius: '14px',
-                  background: paymentMethod === 'CASH' ? 'rgba(200,150,62,0.18)' : 'rgba(255,255,255,0.03)',
-                  border: paymentMethod === 'CASH' ? '1px solid var(--primary)' : '1px solid rgba(255,255,255,0.06)',
-                  cursor: 'pointer'
-                }}
-              >
-                <input
-                  type="radio"
-                  name="payMethod"
-                  checked={paymentMethod === 'CASH'}
-                  onChange={() => setPaymentMethod('CASH')}
-                />
-                <span className="material-symbols-outlined" style={{ color: 'var(--primary)' }}>payments</span>
-                <div>
-                  <span style={{ fontSize: '13px', fontWeight: 700, display: 'block' }}>
-                    {orderMode === 'DELIVERY' ? 'كاش عند استلام الطلب' : 'كاش عند الكاشير / الطاولة'}
-                  </span>
-                  <span style={{ fontSize: '11px', color: 'var(--on-surface-variant)' }}>الدفع نقداً بعد استلام المشروبات</span>
-                </div>
-              </label>
-
-              <label
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '0.75rem 1rem',
-                  borderRadius: '14px',
-                  background: paymentMethod === 'VODAFONE_CASH' ? 'rgba(200,150,62,0.18)' : 'rgba(255,255,255,0.03)',
-                  border: paymentMethod === 'VODAFONE_CASH' ? '1px solid var(--primary)' : '1px solid rgba(255,255,255,0.06)',
-                  cursor: 'pointer'
-                }}
-              >
-                <input
-                  type="radio"
-                  name="payMethod"
-                  checked={paymentMethod === 'VODAFONE_CASH'}
-                  onChange={() => setPaymentMethod('VODAFONE_CASH')}
-                />
-                <span className="material-symbols-outlined" style={{ color: 'var(--secondary)' }}>phonelink_ring</span>
-                <div>
-                  <span style={{ fontSize: '13px', fontWeight: 700, display: 'block' }}>فودافون كاش أو إنستاباي (InstaPay)</span>
-                  <span style={{ fontSize: '11px', color: 'var(--on-surface-variant)' }}>تحويل فوري لرقم كاشير دياب كافيه المعتمد</span>
-                </div>
-              </label>
-
-              <label
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '0.75rem 1rem',
-                  borderRadius: '14px',
-                  background: paymentMethod === 'CARD' ? 'rgba(200,150,62,0.18)' : 'rgba(255,255,255,0.03)',
-                  border: paymentMethod === 'CARD' ? '1px solid var(--primary)' : '1px solid rgba(255,255,255,0.06)',
-                  cursor: 'pointer'
-                }}
-              >
-                <input
-                  type="radio"
-                  name="payMethod"
-                  checked={paymentMethod === 'CARD'}
-                  onChange={() => setPaymentMethod('CARD')}
-                />
-                <span className="material-symbols-outlined" style={{ color: 'var(--tertiary)' }}>credit_card</span>
-                <div>
-                  <span style={{ fontSize: '13px', fontWeight: 700, display: 'block' }}>بطاقة بنكية / فيزا أو ماستركارد</span>
-                  <span style={{ fontSize: '11px', color: 'var(--on-surface-variant)' }}>ماكينة نقاط البيع المحمولة POS</span>
-                </div>
-              </label>
-            </div>
-          </div>
-
-          {/* Order Review List */}
-          <div
-            style={{
-              background: 'var(--surface-container-high)',
-              border: '1px solid rgba(244, 189, 97, 0.25)',
-              borderRadius: '20px',
-              padding: '1.25rem',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '0.65rem'
-            }}
-          >
-            <h3 style={{ fontSize: '14px', fontWeight: 800, borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.4rem' }}>
-              مراجعة الأصناف ({cart.length}):
-            </h3>
-            {cart.map((item) => (
-              <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12.5px' }}>
-                <span>
-                  {item.quantity}× {item.productName} {item.modifiersSummary ? `(${item.modifiersSummary})` : ''}
-                </span>
-                <span style={{ fontWeight: 700 }}>{formatEGP(item.totalCents)}</span>
-              </div>
-            ))}
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12.5px', marginTop: '0.35rem', paddingTop: '0.35rem', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-              <span style={{ color: 'var(--on-surface-variant)' }}>المجموع الفرعي:</span>
-              <span>{formatEGP(cartTotalCents)}</span>
-            </div>
-
-            {orderMode === 'DELIVERY' && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12.5px' }}>
-                <span style={{ color: 'var(--on-surface-variant)' }}>رسوم التوصيل:</span>
-                <span>{formatEGP(deliveryFeeCents)}</span>
-              </div>
-            )}
-
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                fontSize: '17px',
-                fontWeight: 800,
-                color: 'var(--primary)',
-                paddingTop: '0.5rem',
-                borderTop: '1px solid rgba(255,255,255,0.08)'
-              }}
-            >
-              <span>المبلغ الإجمالي:</span>
-              <span>{formatEGP(grandTotalCents)}</span>
-            </div>
-
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="btn-primary"
-              style={{ width: '100%', height: '3.35rem', justifyContent: 'center', fontSize: '14.5px', marginTop: '0.5rem' }}
-            >
-              {isSubmitting ? (
-                <span>جاري إرسال الطلب للخادم...</span>
-              ) : (
-                <>
-                  <span>تأكيد وإرسال الطلب الآن</span>
-                  <span className="material-symbols-outlined">send</span>
-                </>
-              )}
+            {state.errorCode && state.errorCode !== 'UNKNOWN' && <span>{CUSTOMER_ERROR_MESSAGES[state.errorCode]}</span>}
+            <strong>لم نتأكد بعد إن كان طلبك السابق قد وصل للكافيه.</strong>
+            <span>أعد إرسال نفس الطلب للتأكد — لن يتكرر الطلب إذا كان قد وصل بالفعل.</span>
+            <button type="button" className="btn-primary" onClick={async () => setBlocker(await checkout.retryUnresolved())} id="retry-previous-btn">
+              <span>إعادة إرسال نفس الطلب</span>
+              <span className="material-symbols-outlined">refresh</span>
             </button>
+            <span className="summary-note">إذا عدّلت السلة أو البيانات، سيُرسل كطلب جديد منفصل.</span>
           </div>
+        )}
+
+        {errorPhase && !showUnresolvedBanner && state.errorCode && (
+          <div
+            className={`checkout-status-panel ${state.phase === 'FAILED' ? 'is-warning' : 'is-error'}`}
+            role="alert"
+            id="checkout-status-panel"
+            data-phase={state.phase}
+            data-request-id={state.lastRequestId ?? ''}
+          >
+            <strong>{CUSTOMER_ERROR_MESSAGES[state.errorCode]}</strong>
+            {NEEDS_CART_REVIEW.has(state.phase) && (
+              <button type="button" className="btn-secondary" onClick={() => setActiveTab('cart')}>
+                مراجعة السلة
+              </button>
+            )}
+          </div>
+        )}
+
+        {blocker && (
+          <div className="inline-notice is-error" role="alert">
+            <span className="material-symbols-outlined" aria-hidden="true">info</span>
+            <span>{BLOCKER_TEXT[blocker]}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          <fieldset disabled={submitting} className="checkout-fieldset">
+            <div className="checkout-box">
+              <h3 style={{ fontSize: '15px', fontWeight: 800, color: 'var(--on-surface)' }}>
+                {contactRequired ? 'بيانات التواصل:' : 'بياناتك (اختياري):'}
+              </h3>
+
+              <div>
+                <label className="checkout-label" htmlFor="checkout-name">الاسم {contactRequired && '*'}</label>
+                <input
+                  id="checkout-name"
+                  type="text"
+                  className="checkout-input"
+                  autoComplete="name"
+                  maxLength={LIMITS.nameMax}
+                  value={form.fullName}
+                  aria-invalid={!!fieldErrors.fullName}
+                  onChange={(e) => update('fullName', e.target.value)}
+                  style={{ width: '100%' }}
+                />
+                {fieldErrors.fullName && <p className="field-error">{fieldErrors.fullName}</p>}
+              </div>
+
+              <div>
+                <label className="checkout-label" htmlFor="checkout-phone">رقم الهاتف {contactRequired && '*'}</label>
+                <input
+                  id="checkout-phone"
+                  type="tel"
+                  inputMode="tel"
+                  className="checkout-input"
+                  autoComplete="tel"
+                  maxLength={20}
+                  value={form.phone}
+                  aria-invalid={!!fieldErrors.phone}
+                  onChange={(e) => update('phone', e.target.value)}
+                  style={{ width: '100%', direction: 'ltr', textAlign: 'right' }}
+                />
+                {fieldErrors.phone && <p className="field-error">{fieldErrors.phone}</p>}
+              </div>
+
+              {orderType === 'DELIVERY' && (
+                <div>
+                  <label className="checkout-label" htmlFor="checkout-address">عنوان التوصيل *</label>
+                  <textarea
+                    id="checkout-address"
+                    className="checkout-input"
+                    autoComplete="street-address"
+                    placeholder="المدينة، الشارع، رقم العمارة، الدور والشقة، وأي علامة مميزة"
+                    maxLength={LIMITS.addressMax}
+                    rows={3}
+                    value={form.deliveryAddress}
+                    aria-invalid={!!fieldErrors.deliveryAddress}
+                    onChange={(e) => update('deliveryAddress', e.target.value)}
+                    style={{ width: '100%', height: 'auto', padding: '0.65rem' }}
+                  />
+                  {fieldErrors.deliveryAddress && <p className="field-error">{fieldErrors.deliveryAddress}</p>}
+                </div>
+              )}
+
+              <div>
+                <label className="checkout-label" htmlFor="checkout-notes">ملاحظات للكافيه (اختياري)</label>
+                <textarea
+                  id="checkout-notes"
+                  className="checkout-input"
+                  placeholder="مثال: ثلج إضافي، السكر منفصل..."
+                  maxLength={LIMITS.notesMax}
+                  rows={2}
+                  value={form.notes}
+                  aria-invalid={!!fieldErrors.notes}
+                  onChange={(e) => update('notes', e.target.value)}
+                  style={{ width: '100%', height: 'auto', padding: '0.65rem' }}
+                />
+                <span className="char-counter">{form.notes.length}/{LIMITS.notesMax}</span>
+                {fieldErrors.notes && <p className="field-error">{fieldErrors.notes}</p>}
+              </div>
+            </div>
+
+            <div className="checkout-box">
+              <h3 style={{ fontSize: '15px', fontWeight: 800 }}>طريقة الدفع:</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }} role="radiogroup">
+                {(['CASH', 'CREDIT_CARD'] as PaymentMethod[]).map((method) => (
+                  <label key={method} className={`payment-option ${form.paymentMethod === method ? 'is-selected' : ''}`}>
+                    <input
+                      type="radio"
+                      name="payMethod"
+                      value={method}
+                      checked={form.paymentMethod === method}
+                      onChange={() => update('paymentMethod', method)}
+                    />
+                    <span className="material-symbols-outlined" style={{ color: 'var(--primary)' }}>
+                      {method === 'CASH' ? 'payments' : 'credit_card'}
+                    </span>
+                    <span style={{ fontSize: '13px', fontWeight: 700 }}>{paymentMethodLabel(method, orderType)}</span>
+                  </label>
+                ))}
+              </div>
+              <p className="summary-note">لا يتم أي دفع عبر الموقع. يتم الدفع مع فريق الكافيه.</p>
+            </div>
+
+            {/* Review */}
+            <div className="checkout-box">
+              <h3 style={{ fontSize: '14px', fontWeight: 800, borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.4rem' }}>
+                مراجعة الأصناف ({cart.itemCount}):
+              </h3>
+              {cart.reconciled.map(({ line, estimatedCents }) => {
+                const product = index?.productsById.get(line.productId);
+                const options = product
+                  ? line.modifierOptionIds.map((id) => findOption(product, id)?.option.name).filter(Boolean).join('، ')
+                  : '';
+                return (
+                  <div key={line.lineId} style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', fontSize: '12.5px' }}>
+                    <span>
+                      {line.quantity}× {product?.name ?? 'صنف'} {options ? `(${options})` : ''}
+                    </span>
+                    <span style={{ fontWeight: 700, flexShrink: 0 }}>{formatMoney(estimatedCents)}</span>
+                  </div>
+                );
+              })}
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '16px', fontWeight: 800, color: 'var(--primary)', paddingTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                <span>الإجمالي التقديري:</span>
+                <span id="checkout-estimated-total">{formatMoney(cart.estimatedTotalCents)}</span>
+              </div>
+              <p className="summary-note">يؤكد الكافيه الإجمالي النهائي عند استلام الطلب. إذا تغيرت الأسعار سنطلب منك المراجعة قبل الإرسال.</p>
+
+              <button
+                type="submit"
+                id="checkout-submit"
+                className="btn-primary"
+                disabled={submitting || cart.hasIssues || cart.itemCount === 0}
+                style={{ width: '100%', height: '3.25rem', justifyContent: 'center', marginTop: '0.75rem', fontSize: '14px' }}
+              >
+                {submitting ? (
+                  <span>جارٍ إرسال الطلب للكافيه...</span>
+                ) : state.phase === 'FAILED' ? (
+                  <>
+                    <span>إعادة المحاولة</span>
+                    <span className="material-symbols-outlined">refresh</span>
+                  </>
+                ) : (
+                  <>
+                    <span>إرسال الطلب للكافيه</span>
+                    <span className="material-symbols-outlined">send</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </fieldset>
         </form>
       </div>
     </main>

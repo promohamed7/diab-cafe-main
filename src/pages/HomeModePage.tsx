@@ -1,5 +1,8 @@
 import React, { useEffect, useRef } from 'react';
-import { useStore } from '../context/StoreContext';
+import { useUI } from '../context/UIContext';
+import { useOrderContext } from '../hooks/useOrderContext';
+import { useCatalog } from '../hooks/useCatalog';
+import type { OutsideOrderType } from '../types/order';
 import dineinHero from '../assets/images/dinein-hero.webp';
 import pickupHero from '../assets/images/pickup-hero.webp';
 import deliveryHero from '../assets/images/delivery-hero.webp';
@@ -7,12 +10,10 @@ import heroBannerImage from '../assets/images/hero-banner.webp';
 import heroMobileBannerImage from '../assets/images/hero-banner-mobile.webp';
 
 export const HomeModePage: React.FC = () => {
-  const {
-    setOrderMode,
-    openTableModal,
-    setActiveTab,
-    setIsHeroTitleDocked
-  } = useStore();
+  const { setActiveTab, setIsHeroTitleDocked, showToast } = useUI();
+  const { table, setOutsideType } = useOrderContext();
+  const { index } = useCatalog();
+  const store = index?.catalog.store ?? null;
 
   const heroTitleRef = useRef<HTMLHeadingElement | null>(null);
   const flyingTitleRef = useRef<HTMLDivElement | null>(null);
@@ -135,14 +136,22 @@ export const HomeModePage: React.FC = () => {
     };
   }, [setIsHeroTitleDocked]);
 
-  const handleTakeaway = () => {
-    setOrderMode('PICKUP');
+  const chooseOutside = (type: OutsideOrderType) => {
+    if (!setOutsideType(type)) {
+      // Dine-in is locked while a Café table session is active.
+      showToast(`أنت تطلب الآن من ${table?.tableLabel ?? 'طاولتك'}. اضغط "إنهاء طلب الطاولة" أولاً للطلب خارج الكافيه.`, 'info');
+      return;
+    }
     setActiveTab('menu');
   };
+  const handleTakeaway = () => chooseOutside('PICKUP');
+  const handleDelivery = () => chooseOutside('DELIVERY');
 
-  const handleDelivery = () => {
-    setOrderMode('DELIVERY');
-    setActiveTab('menu');
+  // Dine-in starts only from the QR code on the table. Without a Café-resolved
+  // table the card just explains how to start; it never offers a table picker.
+  const handleDineIn = () => {
+    if (table) setActiveTab('menu');
+    else showToast('امسح كود QR الموجود على طاولتك بكاميرا هاتفك لبدء الطلب من الطاولة.', 'info');
   };
 
   return (
@@ -196,7 +205,7 @@ export const HomeModePage: React.FC = () => {
         {/* 3 ORDER MODE CARDS */}
         <div className="order-cards">
           {/* CARD 1: Dine-In QR Table Order */}
-          <article className="order-card animate-entrance" id="card-dinein" onClick={openTableModal}>
+          <article className="order-card animate-entrance" id="card-dinein" onClick={handleDineIn}>
             <div className="card-image-wrapper">
               <img
                 className="card-image"
@@ -219,7 +228,9 @@ export const HomeModePage: React.FC = () => {
                 </span>
               </h2>
               <p className="card-description">
-                جالس على طاولتك؟ امسح كود QR واطلب مباشرة من المنيو الكامل بدون انتظار. يصل طلبك لطاولتك فوراً.
+                {table
+                  ? `أنت متصل الآن بـ ${table.tableLabel}. تصفح المنيو وأرسل طلبك مباشرة للكافيه.`
+                  : 'جالس على طاولتك؟ امسح كود QR الموجود على الطاولة بكاميرا هاتفك لتفتح المنيو وتطلب مباشرة.'}
               </p>
               <div className="card-features">
                 <div className="feature-badge">
@@ -241,10 +252,10 @@ export const HomeModePage: React.FC = () => {
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  openTableModal();
+                  handleDineIn();
                 }}
               >
-                <span>ابدأ الطلب من طاولتك</span>
+                <span>{table ? `متابعة الطلب — ${table.tableLabel}` : 'امسح كود الطاولة للبدء'}</span>
                 <span className="material-symbols-outlined btn-icon-arrow">arrow_back</span>
               </button>
             </div>
@@ -274,14 +285,14 @@ export const HomeModePage: React.FC = () => {
                 </span>
               </h2>
               <p className="card-description">
-                اطلب مشروباتك المفضلة وادفع مسبقاً واستلم طلبك جاهزاً دون أي انتظار فور وصولك للمحمصة.
+                اطلب مشروباتك المفضلة مسبقاً واستلمها من الفرع، وادفع عند الاستلام كاش أو بالبطاقة.
               </p>
               <div className="card-features">
                 <div className="feature-badge">
                   <span className="material-symbols-outlined" style={{ color: 'var(--tertiary)' }}>
                     timer
                   </span>
-                  <span>جاهز خلال 10-15 دقيقة</span>
+                  <span>طلب مسبق</span>
                 </div>
                 <div className="feature-badge">
                   <span className="material-symbols-outlined" style={{ color: 'var(--primary)' }}>
@@ -342,7 +353,7 @@ export const HomeModePage: React.FC = () => {
                   <span className="material-symbols-outlined" style={{ color: 'var(--primary)' }}>
                     payments
                   </span>
-                  <span>دفع آمن ومتعدد</span>
+                  <span>الدفع عند الاستلام</span>
                 </div>
               </div>
               <button
@@ -369,11 +380,15 @@ export const HomeModePage: React.FC = () => {
             </div>
             <div className="store-details">
               <div className="store-name-row">
-                <span className="store-name">فرع سيدي سالم الرئيسي</span>
-                <span className="store-status-dot"></span>
-                <span className="store-status-text">مفتوح الآن</span>
+                <span className="store-name">{store?.name || 'فرع سيدي سالم الرئيسي'}</span>
               </div>
               <span className="store-hours">يومياً من ٧:٠٠ ص حتى ٢:٠٠ ص (خدمة متواصلة)</span>
+              {store?.address && <span className="store-hours">{store.address}</span>}
+              {store?.phone && (
+                <a className="store-hours" href={`tel:${store.phone}`} style={{ color: 'var(--primary)' }}>
+                  {store.phone}
+                </a>
+              )}
             </div>
           </div>
           <div className="coverage-notice">

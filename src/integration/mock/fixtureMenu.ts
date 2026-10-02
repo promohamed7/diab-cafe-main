@@ -1,6 +1,33 @@
-import { Category, Product, UserProfile } from '../types';
+// DEVELOPMENT FIXTURE ONLY.
+//
+// This is the menu content the prototype used to hard-code. It now only feeds
+// the development mock transport, which turns it into a Café-shaped catalog
+// projection (integer IDs, per-product modifier groups). It is NOT the website's
+// catalog and must never be imported by UI code. In production the menu comes
+// from INBYTE Café.
 
-export const CATEGORIES: Category[] = [
+interface RawCategory {
+  id: string;
+  name: string;
+  nameEn: string;
+  icon: string;
+  isRoastery?: boolean;
+}
+
+interface RawProduct {
+  id: number;
+  categoryId: string;
+  name: string;
+  nameEn: string;
+  priceCents: number;
+  desc: string;
+  inStock: boolean;
+  tag?: string;
+  isRoastery?: boolean;
+  unit?: string;
+}
+
+export const RAW_CATEGORIES: RawCategory[] = [
   { id: 'espresso', name: 'إسبريسو', nameEn: 'Espresso', icon: 'coffee' },
   { id: 'turkish', name: 'قهوة تركية', nameEn: 'Turkish Coffee', icon: 'local_cafe' },
   { id: 'french', name: 'قهوة فرنسية', nameEn: 'French Coffee', icon: 'coffee_maker' },
@@ -23,7 +50,7 @@ export const CATEGORIES: Category[] = [
   { id: 'beans-arabic', name: 'قهوة عربي', nameEn: 'Arabic Coffee', isRoastery: true, icon: 'nest_eco_leaf' }
 ];
 
-export const PRODUCTS: Product[] = [
+export const RAW_PRODUCTS: RawProduct[] = [
   // 1. ESPRESSO
   { id: 101, categoryId: 'espresso', name: 'ريستريتو', nameEn: 'Ristretto', priceCents: 3500, desc: 'شوت إسبريسو مركز ومكثف بنكهة غنية عميقة', inStock: true, tag: 'كلاسيك' },
   { id: 102, categoryId: 'espresso', name: 'إسبريسو', nameEn: 'Espresso', priceCents: 4000, desc: 'جرعة إسبريسو صافية مع كريما ذهبية غنية', inStock: true, tag: 'Signature' },
@@ -211,117 +238,3 @@ export const PRODUCTS: Product[] = [
   { id: 1901, categoryId: 'beans-arabic', name: 'قهوة عربي إثيوبي هراري', nameEn: 'Ethiopian Harari Arabic Roast', priceCents: 7500, desc: 'بن هراري ذهبي فاتح مخضر مخصص للدلة والمجالس العربية الأصيلة', inStock: true, isRoastery: true, unit: '1/8k', tag: 'مجالس دياب' },
   { id: 1902, categoryId: 'beans-arabic', name: 'قهوة عربي أحمر تحميص', nameEn: 'Red Roasted Arabic Blend', priceCents: 7000, desc: 'بن عربي بتحميص كستنائي مائل للحمرة مع نكهات دافئة خفيفة', inStock: true, isRoastery: true, unit: '1/8k', tag: 'تحميص خاص' }
 ];
-
-export const DRINK_MODIFIERS = {
-  sizes: [
-    { id: 'single', name: 'سينجل / عادي', nameEn: 'Single / Regular', deltaCents: 0 },
-    { id: 'double', name: 'دبل / كبير', nameEn: 'Double / Large', deltaCents: 1500 }
-  ],
-  milks: [
-    { id: 'whole', name: 'حليب كامل الدسم', nameEn: 'Whole Milk', deltaCents: 0 },
-    { id: 'skim', name: 'حليب خالي الدسم', nameEn: 'Skimmed Milk', deltaCents: 0 },
-    { id: 'oat', name: 'حليب شوفان عضوي (+15 ج.م)', nameEn: 'Oat Milk (+15 EGP)', deltaCents: 1500 },
-    { id: 'almond', name: 'حليب لوز نقي (+15 ج.م)', nameEn: 'Almond Milk (+15 EGP)', deltaCents: 1500 }
-  ],
-  sweetness: [
-    { id: 'no-sugar', name: 'بدون سكر (Zero)', deltaCents: 0 },
-    { id: 'light', name: 'سكر خفيف (1/2 معلقة)', deltaCents: 0 },
-    { id: 'medium', name: 'سكر مظبوط (1 معلقة)', deltaCents: 0 },
-    { id: 'extra', name: 'سكر زيادة (2 معلقة)', deltaCents: 0 }
-  ],
-  extraShots: [
-    { id: 'none', name: 'بدون شوت إضافي', deltaCents: 0 },
-    { id: 'single-shot', name: 'شوت إسبريسو إضافي (+20 ج.م)', deltaCents: 2000 }
-  ],
-  syrups: [
-    { id: 'none', name: 'بدون سيرب إضافي', deltaCents: 0 },
-    { id: 'vanilla', name: 'فانيليا (+15 ج.م)', deltaCents: 1500 },
-    { id: 'caramel', name: 'كراميل (+15 ج.م)', deltaCents: 1500 },
-    { id: 'hazelnut', name: 'بندق (+15 ج.م)', deltaCents: 1500 },
-    { id: 'lotus', name: 'لوتس (+20 ج.م)', deltaCents: 2000 },
-    { id: 'pistachio', name: 'بستاشيو (+25 ج.م)', deltaCents: 2500 }
-  ]
-};
-
-export const BEAN_MODIFIERS = {
-  weights: [
-    { id: 'w125', name: '1/8 كجم (125 جم)', multiplier: 1, label: '1/8 كجم' },
-    { id: 'w250', name: '1/4 كجم (250 جم)', multiplier: 2, label: '1/4 كجم' },
-    { id: 'w500', name: '1/2 كجم (500 جم)', multiplier: 4, label: '1/2 كجم' },
-    { id: 'w1000', name: '1 كجم كامل (1000 جم)', multiplier: 8, label: '1 كجم' }
-  ],
-  grinds: [
-    { id: 'whole-beans', name: 'حبوب كاملة بدون طحن', desc: 'للطحن المنزلي الطازج', deltaCents: 0 },
-    { id: 'turkish-fine', name: 'طحن تركي ناعم جداً', desc: 'للكنكة والركوة برغوة', deltaCents: 0 },
-    { id: 'espresso-medium', name: 'طحن إسبريسو متوسط النعومة', desc: 'لماكينات الإسبريسو والبورتافلتر', deltaCents: 0 },
-    { id: 'filter-coarse', name: 'طحن خشن فلتر / V60 / فرنش برس', desc: 'للتقطير والترشيح والكبس', deltaCents: 0 }
-  ],
-  roasts: [
-    { id: 'light', name: 'تحميص فاتح (Light)', desc: 'حمضية وفاكهية بارزة' },
-    { id: 'medium', name: 'تحميص وسط (Medium)', desc: 'توازن ونكهة شوكولاتية متناغمة' },
-    { id: 'dark', name: 'تحميص غامق (Dark)', desc: 'قوام ثقيل ونكهة دخانية عميقة' }
-  ],
-  spicing: [
-    { id: 'plain', name: 'سادة بدون إضافات', deltaCents: 0 },
-    { id: 'spiced', name: 'تحويجة دياب الكلاسيكية (هيل ومستكة)', deltaCents: 1000 }
-  ],
-  aromatics: [
-    { id: 'mastic', name: 'إضافة مسكة تركية فاخرة (+15 ج.م)', deltaCents: 1500 },
-    { id: 'saffron', name: 'إضافة زعفران إيراني أصلي (+25 ج.م)', deltaCents: 2500 },
-    { id: 'cardamom', name: 'إضافة هيل أخضر هندي مضاعف (+15 ج.م)', deltaCents: 1500 },
-    { id: 'ginger', name: 'إضافة جنزبيل دافئ (+10 ج.م)', deltaCents: 1000 }
-  ]
-};
-
-export function formatEGP(cents: number): string {
-  if (typeof cents !== 'number' || isNaN(cents)) cents = 0;
-  const egp = (cents / 100).toFixed(2);
-  const clean = egp.endsWith('.00') ? egp.slice(0, -3) : egp;
-  return clean + ' ج.م';
-}
-
-export const DEFAULT_USER: UserProfile = {
-  id: 'usr_cairo_108',
-  name: 'أحمد محمود',
-  phone: '01012345678',
-  authMethod: 'OTP',
-  loyaltyPoints: 1450,
-  savedAddresses: [
-    {
-      id: 'addr_home',
-      label: 'المنزل',
-      city: 'سيدي سالم — وسط البلد',
-      street: 'شارع المحكمة، أمام بنك مصر',
-      building: 'عمارة ٤، الدور الثاني، شقة ٥',
-      isDefault: true
-    },
-    {
-      id: 'addr_office',
-      label: 'مكتب العمل',
-      city: 'سيدي سالم — حي الزهور',
-      street: 'شارع جمال عبد الناصر، مجمع الأطباء',
-      building: 'الدور الأول، عيادة / مكتب 3',
-      isDefault: false
-    }
-  ],
-  usualOrder: {
-    title: 'فلات وايت (حليب شوفان، إكسترا دبل شوت) + كرواسون بالزبدة',
-    tag: 'استلام تيك أواي',
-    mode: 'PICKUP',
-    items: [
-      {
-        id: 'usual_1',
-        productId: 108,
-        productName: 'فلات وايت',
-        productNameEn: 'Flat White',
-        quantity: 1,
-        unitPriceCents: 9000,
-        totalCents: 9000,
-        modifiersSummary: 'حليب شوفان (+15 ج.م)، إكسترا دبل شوت (+20 ج.م)',
-        modifiers: { milk: 'oat', shots: 'extra_double' }
-      }
-    ],
-    totalCents: 9000,
-    priceDisplay: '90 ج.م'
-  }
-};

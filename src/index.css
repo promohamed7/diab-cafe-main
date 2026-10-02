@@ -1,5 +1,6 @@
 @import "./styles/tokens.css";
 @import "./styles/styles.css";
+@import "./styles/ordering.css";
 
 /* Viewport & root overflow handling to eliminate rogue empty scroll areas */
 html,

@@ -1,19 +1,13 @@
 import React from 'react';
-import { useStore } from '../context/StoreContext';
+import { useUI } from '../context/UIContext';
+import { useCart } from '../hooks/useCart';
+import { useOrderContext } from '../hooks/useOrderContext';
 
 export const Header: React.FC = () => {
-  const {
-    cartCount,
-    setActiveTab,
-    toggleTheme,
-    openAuthModal,
-    activeTab,
-    orderMode,
-    tableNumber,
-    openTableModal,
-    toggleSearch,
-    isHeroTitleDocked
-  } = useStore();
+  const { setActiveTab, toggleTheme, activeTab, toggleSearch, isHeroTitleDocked } = useUI();
+  const { itemCount: cartCount } = useCart();
+  const { orderType: orderMode, table } = useOrderContext();
+  const tableLabel = table?.tableLabel ?? '';
 
   return (
     <header className="site-header" id="site-header">
@@ -38,32 +32,31 @@ export const Header: React.FC = () => {
               <button
                 type="button"
                 className="header-mode-badge"
-                onClick={() => {
-                  if (orderMode === 'DINE_IN') openTableModal();
-                  else setActiveTab('home');
-                }}
-                title="اضغط لتغيير الطاولة أو نوع الطلب"
+                onClick={() => setActiveTab('home')}
+                title={orderMode === 'DINE_IN' ? 'طلب من الطاولة' : 'اضغط لتغيير نوع الطلب'}
               >
                 <span className="material-symbols-outlined mode-badge-icon" style={{ fontSize: '15px', color: 'var(--primary)' }}>
                   {orderMode === 'DINE_IN' ? 'table_restaurant' : orderMode === 'PICKUP' ? 'shopping_bag' : 'delivery_dining'}
                 </span>
                 <span className="mode-badge-text desktop-only">
                   {orderMode === 'DINE_IN'
-                    ? `طلب داخل الفرع • طاولة ${tableNumber}`
+                    ? `طلب داخل الفرع • ${tableLabel}`
                     : orderMode === 'PICKUP'
                     ? 'استلام من الفرع (تيك أواي)'
                     : 'توصيل ديليفري للمنزل'}
                 </span>
                 <span className="mode-badge-text mobile-only">
                   {orderMode === 'DINE_IN'
-                    ? `طاولة ${tableNumber}`
+                    ? tableLabel
                     : orderMode === 'PICKUP'
                     ? 'استلام بالفرع'
                     : 'توصيل منزلي'}
                 </span>
-                <span className="material-symbols-outlined mode-badge-edit" style={{ fontSize: '13px' }}>
-                  {orderMode === 'DINE_IN' ? 'edit' : 'swap_horiz'}
-                </span>
+                {orderMode !== 'DINE_IN' && (
+                  <span className="material-symbols-outlined mode-badge-edit" style={{ fontSize: '13px' }}>
+                    swap_horiz
+                  </span>
+                )}
               </button>
             </div>
           ) : (
@@ -93,7 +86,7 @@ export const Header: React.FC = () => {
           )}
         </div>
 
-        {/* Left Side (RTL): Search, User Account & Theme Mode */}
+        {/* Left Side (RTL): Search & Theme Mode */}
         <div className="header-actions">
           {/* Search Button */}
           <button
@@ -104,17 +97,6 @@ export const Header: React.FC = () => {
             onClick={toggleSearch}
           >
             <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>search</span>
-          </button>
-
-          {/* User Profile Button */}
-          <button
-            className="user-login-btn"
-            id="login-trigger"
-            aria-label="تسجيل الدخول أو حسابي"
-            title="حسابي / تسجيل الدخول"
-            onClick={openAuthModal}
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>account_circle</span>
           </button>
 
           {/* Theme Mode Toggle Button */}
