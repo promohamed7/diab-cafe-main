@@ -1,10 +1,10 @@
 // DEVELOPMENT FIXTURE ONLY.
 //
-// This is the menu content the prototype used to hard-code. It now only feeds
-// the development mock transport, which turns it into a Café-shaped catalog
+// Sample menu for the "INBYTE Demo Café" development tenant. It only feeds the
+// development mock transport, which turns it into a Café-shaped catalog
 // projection (integer IDs, per-product modifier groups). It is NOT the website's
-// catalog and must never be imported by UI code. In production the menu comes
-// from INBYTE Café.
+// catalog and must never be imported by UI code. In production every café's
+// menu comes from that café's INBYTE Café catalog.
 
 interface RawCategory {
   id: string;
@@ -79,7 +79,7 @@ export const RAW_PRODUCTS: RawProduct[] = [
   { id: 125, categoryId: 'espresso', name: 'ستروبيري إسبانيش لاتيه', nameEn: 'Strawberry Spanish Latte', priceCents: 7500, desc: 'طبقات من الفراولة الطازجة مع الحليب المكثف والإسبريسو', inStock: true },
 
   // 2. TURKISH COFFEE
-  { id: 201, categoryId: 'turkish', name: 'قهوة تركي إسبشيال', nameEn: 'Special Turkish Coffee', priceCents: 3500, desc: 'خلطة دياب الإسبشيال الخاصة بوش كريمي متماسك (سادة أو محوج)', inStock: true, tag: 'تراث دياب' },
+  { id: 201, categoryId: 'turkish', name: 'قهوة تركي إسبشيال', nameEn: 'Special Turkish Coffee', priceCents: 3500, desc: 'خلطة البيت الإسبشيال الخاصة بوش كريمي متماسك (سادة أو محوج)', inStock: true, tag: 'تراث البيت' },
   { id: 202, categoryId: 'turkish', name: 'قهوة تركي جولد بليند', nameEn: 'Gold Blend Turkish', priceCents: 4000, desc: 'توليفة منتقاة من حبوب القهوة الذهبية الفاخرة (سادة ومحوج)', inStock: true, tag: 'Gold' },
   { id: 203, categoryId: 'turkish', name: 'قهوة تركي أرابيكا بليند', nameEn: 'Arabica Blend Turkish', priceCents: 4000, desc: '100% أرابيكا ناعمة بمذاق متوازن وحمضية لطيفة (سادة ومحوج)', inStock: true },
   { id: 204, categoryId: 'turkish', name: 'قهوة تركي كولومبي', nameEn: 'Colombian Turkish', priceCents: 4500, desc: 'بن كولومبي جبلي ذو قوام حريري ونكهة كراميلية (سادة ومحوج)', inStock: true, tag: 'Single Origin' },
@@ -180,7 +180,7 @@ export const RAW_PRODUCTS: RawProduct[] = [
   { id: 1202, categoryId: 'dessert', name: 'تشيز كيك نيويورك', nameEn: 'New York Cheesecake', priceCents: 6500, desc: 'تشيز كيك كريمي أصلي مع صوص التوت البري أو الكراميل أو اللوتس', inStock: true, tag: 'Chef Choice' },
   { id: 1203, categoryId: 'dessert', name: 'مولتن كيك ساخن', nameEn: 'Warm Molten Lava Cake', priceCents: 7000, desc: 'كيك الشوكولاتة بحشوة لافا بركانية دافئة مع بولة آيس كريم', inStock: true, tag: 'Must Try' },
   { id: 1204, categoryId: 'dessert', name: 'فادج براونيز', nameEn: 'Fudge Brownies', priceCents: 5000, desc: 'قطع البراونيز الغنية بقطع الجوز والشوكولاتة الداكنة', inStock: true },
-  { id: 1205, categoryId: 'dessert', name: 'تيراميسو إيطالي كلاسيك', nameEn: 'Classic Italian Tiramisu', priceCents: 6500, desc: 'بسكويت سافوياردي مشرب بإسبريسو دياب مع كريمة الماسكاربوني', inStock: true, tag: 'Artisanal' },
+  { id: 1205, categoryId: 'dessert', name: 'تيراميسو إيطالي كلاسيك', nameEn: 'Classic Italian Tiramisu', priceCents: 6500, desc: 'بسكويت سافوياردي مشرب بإسبريسو البيت مع كريمة الماسكاربوني', inStock: true, tag: 'Artisanal' },
   { id: 1206, categoryId: 'dessert', name: 'بنانا سبليت', nameEn: 'Banana Split Sundae', priceCents: 6500, desc: 'موز طازج مع بولات آيس كريم ثلاثية وكريمة مخفوقة ومكسرات', inStock: true },
 
   // 13. ADDS & EXTRAS
@@ -191,10 +191,10 @@ export const RAW_PRODUCTS: RawProduct[] = [
 
   // ROASTERY BEANS
   // A. TURKISH BLEND
-  { id: 1401, categoryId: 'beans-turkish', name: 'بن كلاسيك سادة', nameEn: 'Classic Plain Turkish Beans', priceCents: 4500, desc: 'توليفة تقليدية متوازنة من حبوب الروبوستا والأرابيكا المعالجة', inStock: true, isRoastery: true, unit: '1/8k', tag: 'تراث دياب' },
+  { id: 1401, categoryId: 'beans-turkish', name: 'بن كلاسيك سادة', nameEn: 'Classic Plain Turkish Beans', priceCents: 4500, desc: 'توليفة تقليدية متوازنة من حبوب الروبوستا والأرابيكا المعالجة', inStock: true, isRoastery: true, unit: '1/8k', tag: 'تراث البيت' },
   { id: 1402, categoryId: 'beans-turkish', name: 'بن كلاسيك محوج', nameEn: 'Classic Spiced Turkish Beans', priceCents: 5500, desc: 'بن كلاسيك محوج بالهيل الأخضر الفاخر والمستكة وجوزة الطيب', inStock: true, isRoastery: true, unit: '1/8k', tag: 'محوج فاخر' },
-  { id: 1403, categoryId: 'beans-turkish', name: 'بن إسبشيال سادة', nameEn: 'Special Plain Turkish Beans', priceCents: 5500, desc: 'توليفة محمصة دياب الخاصة عالية القوام بدون أي إضافات', inStock: true, isRoastery: true, unit: '1/8k', tag: 'Specialty' },
-  { id: 1404, categoryId: 'beans-turkish', name: 'بن إسبشيال محوج', nameEn: 'Special Spiced Turkish Beans', priceCents: 6500, desc: 'توليفة دياب الإسبشيال المحوجة بالهيل والزعفران والمستكة التركية', inStock: true, isRoastery: true, unit: '1/8k', tag: 'Signature' },
+  { id: 1403, categoryId: 'beans-turkish', name: 'بن إسبشيال سادة', nameEn: 'Special Plain Turkish Beans', priceCents: 5500, desc: 'توليفة محمصتنا الخاصة عالية القوام بدون أي إضافات', inStock: true, isRoastery: true, unit: '1/8k', tag: 'Specialty' },
+  { id: 1404, categoryId: 'beans-turkish', name: 'بن إسبشيال محوج', nameEn: 'Special Spiced Turkish Beans', priceCents: 6500, desc: 'توليفة البيت الإسبشيال المحوجة بالهيل والزعفران والمستكة التركية', inStock: true, isRoastery: true, unit: '1/8k', tag: 'Signature' },
   { id: 1405, categoryId: 'beans-turkish', name: 'بن جولد بليند سادة', nameEn: 'Gold Blend Plain Beans', priceCents: 6500, desc: 'حبوب منتقاة بعناية بدرجة تحميص ذهبية وسلاسة استثنائية', inStock: true, isRoastery: true, unit: '1/8k', tag: 'Gold Series' },
   { id: 1406, categoryId: 'beans-turkish', name: 'بن جولد بليند محوج', nameEn: 'Gold Blend Spiced Beans', priceCents: 7500, desc: 'جولد بليند محوج بأندر التوابل العطرية وأعواد الهيل الصافي', inStock: true, isRoastery: true, unit: '1/8k', tag: 'Gold Series' },
   { id: 1407, categoryId: 'beans-turkish', name: 'بن أرابيكا سادة 100%', nameEn: '100% Arabica Plain Beans', priceCents: 7000, desc: 'حبوب أرابيكا نقية ناعمة من مرتفعات أمريكا اللاتينية', inStock: true, isRoastery: true, unit: '1/8k', tag: '100% Arabica' },
@@ -210,7 +210,7 @@ export const RAW_PRODUCTS: RawProduct[] = [
   { id: 1507, categoryId: 'beans-single', name: 'بن هندي أرابيكا بلانتيشن (سادة ومحوج)', nameEn: 'Indian Arabica Plantation', priceCents: 6500, desc: 'حبوب أرابيكا هندية جبلية بتوابل خفيفة وقوام كريمي ناعم', inStock: true, isRoastery: true, unit: '1/8k', tag: 'Single Origin' },
 
   // C. ESPRESSO BLEND
-  { id: 1601, categoryId: 'beans-espresso', name: 'هاوس بليند 30/70', nameEn: 'House Blend 30/70', priceCents: 6500, desc: 'التوليفة الرسمية المعتمدة للمشروبات الحليبية في بار دياب كافيه', inStock: true, isRoastery: true, unit: '1/8k', tag: 'House Special' },
+  { id: 1601, categoryId: 'beans-espresso', name: 'هاوس بليند 30/70', nameEn: 'House Blend 30/70', priceCents: 6500, desc: 'التوليفة الرسمية المعتمدة للمشروبات الحليبية في بار البيت كافيه', inStock: true, isRoastery: true, unit: '1/8k', tag: 'House Special' },
   { id: 1602, categoryId: 'beans-espresso', name: 'روما 100% أرابيكا', nameEn: 'Roma 100% Arabica Blend', priceCents: 8500, desc: 'تحميص إيطالي كلاسيكي لإسبريسو نقي غني بالكريمة والنكهات الزيتية العطرية', inStock: true, isRoastery: true, unit: '1/8k', tag: '100% Arabica' },
   { id: 1603, categoryId: 'beans-espresso', name: 'روست كريمي 40/60', nameEn: 'Crema Roast 40/60', priceCents: 6000, desc: 'خلطة متوازنة بكريمة كثيفة تدوم طويلاً لخبراء الإسبريسو', inStock: true, isRoastery: true, unit: '1/8k' },
   { id: 1604, categoryId: 'beans-espresso', name: 'هامر جيد سترونج بليند', nameEn: 'Hammer Jade Strong Blend', priceCents: 7000, desc: 'توليفة قوية عالية الكافيين بمذاق داكن مدخن لمحبي القوة والنشاط', inStock: true, isRoastery: true, unit: '1/8k', tag: 'Strong Shot' },
@@ -235,6 +235,6 @@ export const RAW_PRODUCTS: RawProduct[] = [
   { id: 1808, categoryId: 'beans-instant', name: 'نسكافيه إسباني خاص', nameEn: 'Special Spanish Instant Coffee', priceCents: 6000, desc: 'توليفة نسكافيه متبلة ومحلاة على الطريقة الإسبانية', inStock: true, isRoastery: true, unit: 'علبة' },
 
   // F. ARABIC COFFEE
-  { id: 1901, categoryId: 'beans-arabic', name: 'قهوة عربي إثيوبي هراري', nameEn: 'Ethiopian Harari Arabic Roast', priceCents: 7500, desc: 'بن هراري ذهبي فاتح مخضر مخصص للدلة والمجالس العربية الأصيلة', inStock: true, isRoastery: true, unit: '1/8k', tag: 'مجالس دياب' },
+  { id: 1901, categoryId: 'beans-arabic', name: 'قهوة عربي إثيوبي هراري', nameEn: 'Ethiopian Harari Arabic Roast', priceCents: 7500, desc: 'بن هراري ذهبي فاتح مخضر مخصص للدلة والمجالس العربية الأصيلة', inStock: true, isRoastery: true, unit: '1/8k', tag: 'مجالس البيت' },
   { id: 1902, categoryId: 'beans-arabic', name: 'قهوة عربي أحمر تحميص', nameEn: 'Red Roasted Arabic Blend', priceCents: 7000, desc: 'بن عربي بتحميص كستنائي مائل للحمرة مع نكهات دافئة خفيفة', inStock: true, isRoastery: true, unit: '1/8k', tag: 'تحميص خاص' }
 ];

@@ -1,9 +1,20 @@
-# Diab Café Website ↔ INBYTE Café — Integration Contract (website side)
+# INBYTE Café Digital Menu ↔ INBYTE Café — Integration Contract (website side)
 
 This document describes what the website implements and what it expects from
 the INBYTE Café side. It does **not** claim that any Café capability exists:
 every Café-side item marked *dependency* is not implemented in INBYTE Café today
 (see the INBYTE Café Website Integration Specification).
+
+> **Platform (current architecture):** the website now talks to the **INBYTE
+> platform backend** (`server/`, same origin, base `/api/public/v1`). The backend
+> is the relay: it owns tenants, the catalog projection, order intake and
+> tracking, and reaches each café's INBYTE Café through the connector protocol in
+> [INTEGRATION_WITH_INBYTE_CAFE.md](INTEGRATION_WITH_INBYTE_CAFE.md). Start with
+> [ARCHITECTURE.md](ARCHITECTURE.md). This document remains the website-side contract.
+
+> **Multi-café:** the website serves many cafés (tenants). Every endpoint below
+> is scoped under `{base}/tenants/{tenantId}`, and every café's data must stay
+> isolated. See [WHITE_LABEL_ARCHITECTURE.md](WHITE_LABEL_ARCHITECTURE.md).
 
 > The files in `Restricted instraction must follow/` describe an earlier
 > Supabase-based plan. Several statements there do not match the current Café
@@ -36,7 +47,7 @@ selected manually.
 
 ## 3. Catalog contract (Café → website)
 
-`GET {base}/catalog` returns the customer-facing projection:
+`GET {base}/tenants/{tenantId}/catalog` returns the customer-facing projection:
 
 ```jsonc
 {
@@ -62,7 +73,7 @@ selected manually.
 - The website filters again on `isActive && isAvailableOnline` (category and product).
 - `src/integration/parsers.ts` is an **allow-list**: only the fields above are kept.
   Cost prices, barcodes, stock counts, supplier data etc. are dropped even if sent.
-- The parsed catalog is cached in `localStorage` (≤24 h) for display only.
+- The parsed catalog is cached per café in `localStorage` (≤24 h) for display only.
 
 ## 4. Cart contract
 
@@ -73,7 +84,7 @@ product/options are no longer valid are flagged and block checkout.
 
 ## 5. Checkout contract (website → Café)
 
-`POST {base}/orders` with header `Idempotency-Key: <clientRequestId>`:
+`POST {base}/tenants/{tenantId}/orders` with header `Idempotency-Key: <clientRequestId>`:
 
 ```jsonc
 {
@@ -107,18 +118,26 @@ control characters stripped.
 
 ```jsonc
 {
-  "publicReference": "non-guessable string",
-  "orderNumber": "ORD-1042",
+  "tenantId": "cafe-x",
+  "publicReference": "INB-7K4M-92QX-…",     // 80 random bits, the tracking credential
+  "orderNumber": null,                      // Café's ORD-…, once INBYTE Café created the order
   "orderStatus": "PENDING",
   "paymentStatus": "PENDING",
-  "subtotalCents": 5500, "discountCents": 0, "totalCents": 5500,
-  "createdAt": "string|null",
+  "deliveryState": "AWAITING_CAFE",         // AWAITING_CAFE | RECEIVED_BY_CAFE | NOT_DELIVERED
+  "estimatedTotalCents": 5500,              // platform estimate from the last catalog sync
+  "subtotalCents": null, "discountCents": null, "totalCents": null,  // Café's authoritative values, later
+  "createdAt": "…",
   "replayed": false
 }
 ```
 
-The confirmation screen shows Café's `orderNumber`, `totalCents` and status. No
-cashier, shift or other customer data may appear in this response.
+The platform accepts the order *for the café*; INBYTE Café creates it
+asynchronously (see [ORDER_FLOW.md](ORDER_FLOW.md)). The confirmation screen
+therefore says "received — waiting for the café" until Café has it, shows the
+estimate labelled as such, and shows Café's order number and total once known.
+An integration that answers synchronously (order number present, no
+`deliveryState`) is treated as `RECEIVED_BY_CAFE`. No cashier, shift or other
+customer data may appear in this response.
 
 ## 6. clientRequestId lifecycle
 
@@ -136,6 +155,8 @@ Implemented in `src/domain/checkoutAttempt.ts` and `src/hooks/useCheckout.ts`:
 6. Outside-order snapshots live in `localStorage`; dine-in snapshots live in
    `sessionStorage` with the table session and can only be retried for the same,
    unexpired table.
+   All snapshots are stored in the café's own scope and carry the `tenantId`; an
+   attempt is never reused, restored or sent under another café.
 7. Unknown attempts older than 12 h are not reused automatically.
 
 ## 7. DINE_IN QR flow
@@ -143,7 +164,7 @@ Implemented in `src/domain/checkoutAttempt.ts` and `src/hooks/useCheckout.ts`:
 ```
 Printed QR → https://<site>/?table=<Café token>      (parameter name: VITE_TABLE_QR_PARAM, default "table")
   → website removes the token from the address bar
-  → POST {base}/tables/resolve { "token": "<token>" } → { "tableLabel": "طاولة 4" }
+  → POST {base}/tenants/{tenantId}/tables/resolve { "token": "<token>" } → { "tableLabel": "طاولة 4" }
   → banner "تطلب الآن من طاولة 4"; order type locked to DINE_IN / TABLE_QR
   → order carries tableToken unchanged; Café associates the table
 ```
@@ -163,14 +184,18 @@ InstaPay / wallet / bank transfer and online gateways are future extensions.
 
 ## 9. Tracking contract
 
-`GET {base}/orders/{publicReference}` →
+`GET {base}/tenants/{tenantId}/orders/{publicReference}` →
 
 ```jsonc
-{ "publicReference": "...", "orderNumber": "ORD-1042", "orderType": "PICKUP",
+{ "publicReference": "...", "orderNumber": "ORD-1042|null", "orderType": "PICKUP",
   "orderStatus": "PENDING|ACCEPTED|PREPARING|READY|COMPLETED|REJECTED|CANCELLED",
   "paymentStatus": "PENDING|SUBMITTED|VERIFICATION_REQUIRED|VERIFIED|PAID|FAILED|REFUNDED|PARTIALLY_REFUNDED",
-  "totalCents": 5500, "rejectionReason": "string|null", "updatedAt": "string|null" }
+  "deliveryState": "AWAITING_CAFE|RECEIVED_BY_CAFE|NOT_DELIVERED",
+  "estimatedTotalCents": 5500, "totalCents": "5500|null", "rejectionReason": "string|null", "updatedAt": "string|null" }
 ```
+
+`NOT_DELIVERED` means the café never picked the order up before its deadline:
+it was not placed and nothing is owed (shown as such, with orderStatus `CANCELLED`).
 
 - Read-only; polled every 10 s while in progress and visible, backing off on errors,
   stopping at COMPLETED/REJECTED/CANCELLED.
@@ -206,14 +231,27 @@ All variables are public build-time values (`.env.example`):
 | Variable | Purpose |
 |---|---|
 | `VITE_CAFE_TRANSPORT` | `http` (default in production builds) or `mock` (default in `npm run dev`) |
-| `VITE_CAFE_API_BASE_URL` | Base URL of the Café integration adapter/relay. Unset → ordering unavailable |
+| `VITE_CAFE_API_BASE_URL` | Base URL of the platform public API. Default `/api/public/v1` (same origin); `none` disables ordering |
 | `VITE_CAFE_API_TIMEOUT_MS` | Request timeout (default 15000) |
 | `VITE_TABLE_QR_PARAM` | Query parameter carrying the table token (default `table`) |
+| `VITE_TENANT_ID` | Café for the `fixed` strategy (and fallback for others) |
+| `VITE_TENANT_STRATEGY` | `platform` (production default: `/t/{id}/` paths, then the backend maps the hostname), `fixed`, `subdomain` or `path` |
+| `VITE_TENANT_BASE_DOMAIN` | Parent domain for the `subdomain` strategy |
+| `VITE_TENANT_PATH_PREFIX` | Path segment before the tenant id for `path` (default `t`) |
+| `VITE_TENANT_HOST_MAP` | JSON map of custom domains → tenant ids |
+| `VITE_TENANT_CONFIG_SOURCE` | `api` (default: `{base}/tenants/{tenantId}/config`, managed in the INBYTE Admin) or `static` (`/tenants/{tenantId}.json`, bootstrap/demo only) |
 
 Never put secrets in `VITE_*` variables. Any machine credential for Café belongs
 to the relay/adapter, not the browser.
 
 ## 12. Café dependencies (not implemented in Café today)
+
+> **Status update (platform):** items 1, 3 (projection), 5, 6, 7, 8, 9 and 10 are
+> now implemented **by the INBYTE platform backend** for the website. What remains
+> on the Café side is the connector inside INBYTE Café and defence-in-depth
+> validation in `create_order` — see
+> [INTEGRATION_WITH_INBYTE_CAFE.md §9](INTEGRATION_WITH_INBYTE_CAFE.md). The
+> original list is kept below for traceability.
 
 1. A transport: relay or adapter reachable by the website (topology undecided).
 2. Machine authentication between relay/adapter and Café.
@@ -226,6 +264,11 @@ to the relay/adapter, not the browser.
 6. Non-guessable public order reference and public-safe acknowledgement/status DTOs.
 7. Table-token resolution for public callers that accepts tokens only (not raw `tableId`).
 8. Structured, machine-readable error codes.
+9. Tenant-scoped routing and enforcement: `/tenants/{tenantId}/…` reaches the
+   right café; table tokens, public references and idempotency keys are valid only
+   within their own café; unknown tenants answer `TENANT_NOT_FOUND`. Responses may
+   echo `tenantId` — the website rejects a mismatching echo.
+10. Optional: `GET {base}/tenants/{tenantId}/config` (tenant configuration served by the relay).
 
 ## 13. Mock vs production transport
 
@@ -233,30 +276,37 @@ to the relay/adapter, not the browser.
 |---|---|---|
 | Code | `src/integration/httpTransport.ts` | `src/integration/mock/*` |
 | Included in bundle | always | only when built with `VITE_CAFE_TRANSPORT=mock` (dev server default) |
-| Data | Café | prototype menu content reshaped into a Café-like projection with mock IDs |
+| Data | Café | two sample tenants (`inbyte-demo`, `harbor-roast`) with isolated catalogs, tables and orders |
 | UI marker | none | striped "بيئة تطوير" banner |
 
 The mock imitates the *target* Café behaviour so the UI can be built against it;
 it is not the contract. Orders placed there never reach a café. Dev-console hooks
-(`window.__INBYTE_DEV_MOCK__`) exist only in mock builds: `failNextSubmit(
-'NETWORK_ERROR'|'TIMEOUT_AFTER_COMMIT'|'SERVICE_UNAVAILABLE')`, `setOrderStatus(ref,
-status, reason)`, `setPriceDrift(cents)`, `setProductAvailability(id, state)`,
-`receivedRequestIds()`, `listOrders()`, `tableTokens()`, `reset()`.
+(`window.__INBYTE_DEV_MOCK__`, bound to the current tenant;
+`__INBYTE_DEV_MOCK__.forTenant(id)` for another) exist only in mock builds:
+`failNextSubmit('NETWORK_ERROR'|'TIMEOUT_AFTER_COMMIT'|'SERVICE_UNAVAILABLE')`,
+`setOrderStatus(ref, status, reason)`, `setPriceDrift(cents)`,
+`setProductAvailability(id, state)`, `receivedRequestIds()`, `listOrders()`,
+`tableTokens()`, `tenantIds()`, `reset()`.
 
-Mock QR tokens: `qr_7c1e4b9a2f6d4e08`, `qr_a93f02d6c8b14e7f`, `qr_5e8b71c0d4a2493b`,
-`qr_d20c6f9e1b7a4c55`, `qr_0b4e8a7d3c9f4161` — e.g. `http://localhost:3000/?table=qr_7c1e4b9a2f6d4e08`.
+Mock QR tokens — `inbyte-demo`: `qr_7c1e4b9a2f6d4e08`, `qr_a93f02d6c8b14e7f`,
+`qr_5e8b71c0d4a2493b`, `qr_d20c6f9e1b7a4c55`, `qr_0b4e8a7d3c9f4161`;
+`harbor-roast`: `hr_tbl_8f2a71c4e9b3d605`, `hr_tbl_31d9e0b7a6c4f218`.
+E.g. `http://localhost:3000/?table=qr_7c1e4b9a2f6d4e08` or
+`http://localhost:3000/?tenant=harbor-roast&table=hr_tbl_8f2a71c4e9b3d605`.
 
 ## Code map
 
 ```
-src/types/          catalog.ts, order.ts, table.ts — Café-shaped types
+src/types/          catalog.ts, order.ts, table.ts, tenant.ts
+src/tenant/         TenantContext (provider, useTenant, useMoney), tenantResolver, parseTenantConfig,
+                    tenantPolicy, tenantTheme, scopedStorage, tenantSwitch, tenantScope
 src/domain/         pure logic: cart, modifiers, pricing (display), customer validation,
                     checkoutAttempt (payload + clientRequestId), orderStatus (presentation)
 src/integration/    transport interface, http + unconfigured transports, errors, allow-list parsers, mock/
-src/services/       cafeCatalogService, cafeTableService, cafeOrderService, cafeTrackingService,
-                    storage, trackedOrdersStore
+src/services/       tenantConfigService, cafeCatalogService, cafeTableService, cafeOrderService,
+                    cafeTrackingService, checkoutAttemptStore, trackedOrdersStore, storage (legacy cleanup)
 src/hooks/          useCatalog, useOrderContext (outside mode + QR table), useCart,
                     useCheckout, useOrderTracking
-src/context/        UIContext (navigation, theme, toasts, modals only)
+src/context/        UIContext (navigation, theme + tenant theme variables, toasts, modals)
 tests/              node:test unit tests (`npm test`, Node ≥ 22.18)
 ```

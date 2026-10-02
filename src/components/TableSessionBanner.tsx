@@ -17,11 +17,20 @@ export const TableSessionBanner: React.FC = () => {
     );
   }
 
+  if (tableStatus === 'disabled') {
+    return (
+      <div className="table-session-banner is-error" role="alert">
+        <span className="material-symbols-outlined" aria-hidden="true">table_restaurant</span>
+        <span>الطلب من الطاولة غير متاح في هذا المقهى. يمكنك تصفح المنيو.</span>
+      </div>
+    );
+  }
+
   if (tableStatus === 'invalid') {
     return (
       <div className="table-session-banner is-error" role="alert">
         <span className="material-symbols-outlined" aria-hidden="true">error</span>
-        <span>كود الطاولة غير صالح أو منتهي. امسح الكود الموجود على طاولتك مرة أخرى، أو اطلب للاستلام أو التوصيل.</span>
+        <span>كود الطاولة غير صالح لهذا المقهى أو منتهي. امسح الكود الموجود على طاولتك مرة أخرى.</span>
       </div>
     );
   }

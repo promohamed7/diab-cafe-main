@@ -52,6 +52,8 @@ export interface CatalogProduct {
   isActive: boolean;
   isAvailableOnline: boolean;
   availability: AvailabilityHint;
+  /** Highlighted by the café in the INBYTE Admin (presentation only). */
+  isFeatured?: boolean;
   modifierGroups: CatalogModifierGroup[];
 }
 

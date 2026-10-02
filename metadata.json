@@ -1,6 +1,6 @@
 {
-  "name": "Diab Cafe",
-  "description": "Artisanal coffee roastery and ordering platform for Diab Cafe in Sidi Salem. Features dine-in QR ordering, takeaway pickup, home delivery, live order tracking, and roastery store.",
+  "name": "INBYTE Café Digital Menu",
+  "description": "White-label digital menu and customer ordering channel for cafés using INBYTE Café. Supports pickup, delivery and dine-in QR ordering with read-only order tracking; each café is configured as a tenant.",
   "capabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
   ]

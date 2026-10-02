@@ -1,11 +1,19 @@
-// Tracking service: read-only status lookup by Café's non-guessable public
-// reference. There is intentionally no function that changes an order.
+// Tracking service: read-only status lookup by the café's non-guessable public
+// reference, always within the visitor's café. There is intentionally no
+// function that changes an order.
 
 import type { OrderStatusSnapshot } from '../types/order';
+import type { TenantScope } from '../tenant/tenantScope';
 import { getCafeTransport } from '../integration';
-import { parseStatusSnapshot } from '../integration/parsers';
+import { assertTenantEcho, parseStatusSnapshot } from '../integration/parsers';
 
-export async function getOrderStatus(publicReference: string, signal?: AbortSignal): Promise<OrderStatusSnapshot> {
+export async function getOrderStatus(
+  scope: TenantScope,
+  publicReference: string,
+  signal?: AbortSignal
+): Promise<OrderStatusSnapshot> {
   const transport = await getCafeTransport();
-  return parseStatusSnapshot(await transport.getOrderStatus(publicReference, signal));
+  const raw = await transport.getOrderStatus(scope.tenantId, publicReference, signal);
+  assertTenantEcho(raw, scope.tenantId);
+  return parseStatusSnapshot(raw);
 }

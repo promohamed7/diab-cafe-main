@@ -1,12 +1,13 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { CafeId } from '../types/catalog';
-import { readString, writeString } from '../services/storage';
+import { useTenant } from '../tenant/TenantContext';
+import { themeVariables } from '../tenant/tenantTheme';
 
 // Presentation-only state: navigation, theme, toasts, search and modals.
 // Catalog, cart, ordering context, checkout and tracking live in their own
 // providers/hooks under src/hooks.
 
-export type NavigationTab = 'home' | 'menu' | 'cart' | 'checkout' | 'order' | 'heritage';
+export type NavigationTab = 'home' | 'menu' | 'cart' | 'checkout' | 'order' | 'about';
 export type ToastTone = 'success' | 'error' | 'info';
 
 export interface ToastMessage {
@@ -41,16 +42,34 @@ interface UIContextValue {
   setIsHeroTitleDocked: (docked: boolean) => void;
 }
 
-const THEME_KEY = 'inbyte-cafe-theme';
+const THEME_NAME = 'theme';
 const UIContext = createContext<UIContextValue | null>(null);
 
 export const UIProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [theme, setTheme] = useState<'dark' | 'light'>(() => (readString(THEME_KEY) === 'light' ? 'light' : 'dark'));
+  const { tenant, scope } = useTenant();
+  // The visitor's light/dark choice is remembered per café; the café picks the default.
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    const saved = scope.storage.readString(THEME_NAME);
+    return saved === 'light' || saved === 'dark' ? saved : tenant.branding.defaultTheme;
+  });
+  const appliedVars = useRef<string[]>([]);
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-    writeString(THEME_KEY, theme);
-  }, [theme]);
-  const toggleTheme = useCallback(() => setTheme((t) => (t === 'dark' ? 'light' : 'dark')), []);
+    const root = document.documentElement;
+    root.setAttribute('data-theme', theme);
+    // Tenant branding = CSS variable values on top of the shared design tokens.
+    for (const name of appliedVars.current) root.style.removeProperty(name);
+    const vars = themeVariables(tenant.branding, theme);
+    for (const [name, value] of Object.entries(vars)) root.style.setProperty(name, value);
+    appliedVars.current = Object.keys(vars);
+  }, [theme, tenant.branding, scope]);
+  // Only an explicit choice is remembered; otherwise the café's current default applies.
+  const toggleTheme = useCallback(() => {
+    setTheme((t) => {
+      const next = t === 'dark' ? 'light' : 'dark';
+      scope.storage.writeString(THEME_NAME, next);
+      return next;
+    });
+  }, [scope]);
 
   const [activeTab, setActiveTabState] = useState<NavigationTab>('home');
   const [hasAutoOpenedCategories, setHasAutoOpenedCategories] = useState(false);

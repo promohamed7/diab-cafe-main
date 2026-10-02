@@ -2,12 +2,16 @@ import React from 'react';
 import { useUI } from '../context/UIContext';
 import { useCart } from '../hooks/useCart';
 import { useOrderContext } from '../hooks/useOrderContext';
+import { useTenant } from '../tenant/TenantContext';
 
 export const Header: React.FC = () => {
   const { setActiveTab, toggleTheme, activeTab, toggleSearch, isHeroTitleDocked } = useUI();
   const { itemCount: cartCount } = useCart();
   const { orderType: orderMode, table } = useOrderContext();
   const tableLabel = table?.tableLabel ?? '';
+  const { tenant } = useTenant();
+  const { identity } = tenant;
+  const heroTitle = tenant.content.heroTitle;
 
   return (
     <header className="site-header" id="site-header">
@@ -71,17 +75,22 @@ export const Header: React.FC = () => {
                   className={`brand-scrolled-title brand-desktop-dock ${isHeroTitleDocked ? 'is-docked' : ''}`}
                   id="brand-scrolled-title"
                 >
-                  <span className="scrolled-title-text">
-                    أين تود الاستمتاع <span className="gold-gradient-text">بقهوتك اليوم؟</span>
-                  </span>
-                  <span className="brand-separator">•</span>
+                  {heroTitle && (
+                    <>
+                      <span className="scrolled-title-text gold-gradient-text">{heroTitle}</span>
+                      <span className="brand-separator">•</span>
+                    </>
+                  )}
                 </span>
-                <span className="brand-name">DIAB CAFE</span>
+                {identity.logoUrl && <img className="brand-logo" src={identity.logoUrl} alt="" aria-hidden="true" />}
+                <span className="brand-name" id="brand-name">{identity.displayName}</span>
               </div>
-              <div className={`brand-subtitle ${isHeroTitleDocked ? 'is-hidden' : ''}`}>
-                <span className="brand-dot"></span>
-                <span>Artisanal Roastery</span>
-              </div>
+              {identity.tagline && (
+                <div className={`brand-subtitle ${isHeroTitleDocked ? 'is-hidden' : ''}`}>
+                  <span className="brand-dot"></span>
+                  <span id="brand-tagline">{identity.tagline}</span>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -119,7 +128,7 @@ export const Header: React.FC = () => {
         id="brand-mobile-docked-title"
         aria-hidden={!isHeroTitleDocked}
       >
-        <span>أين تود الاستمتاع <span className="gold-gradient-text">بقهوتك اليوم؟</span></span>
+        {heroTitle && <span className="gold-gradient-text">{heroTitle}</span>}
       </div>
     </header>
   );

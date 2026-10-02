@@ -1,16 +1,18 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import type { OrderAcknowledgement, PaymentMethod } from '../types/order';
 import type { CheckoutAttempt, OrderDraft } from '../domain/checkoutAttempt';
-import { buildOrderDraft, canonicalJson, resolveAttempt, sanitizeStoredAttempt } from '../domain/checkoutAttempt';
+import { buildOrderDraft, canonicalJson, resolveAttempt } from '../domain/checkoutAttempt';
 import type { CheckoutFormInput, CheckoutField } from '../domain/customer';
 import { validateCheckoutInput } from '../domain/customer';
 import { findOption } from '../domain/catalogIndex';
 import type { CafeErrorCode } from '../integration/errors';
 import { toCafeError } from '../integration/errors';
 import { submitOrder } from '../services/cafeOrderService';
-import { readJson, removeKey, writeJson } from '../services/storage';
+import { createCheckoutAttemptStore } from '../services/checkoutAttemptStore';
 import type { TrackedOrder } from '../services/trackedOrdersStore';
-import { addTrackedOrder } from '../services/trackedOrdersStore';
+import { trackedOrdersStore } from '../services/trackedOrdersStore';
+import { useTenant } from '../tenant/TenantContext';
+import { meetsMinimumOrder, offeredPaymentMethods } from '../tenant/tenantPolicy';
 import { useCart } from './useCart';
 import { useCatalog } from './useCatalog';
 import { useOrderContext } from './useOrderContext';
@@ -45,14 +47,21 @@ export interface CheckoutState {
   lastSendWasRetry: boolean;
 }
 
-export type SubmitBlocker = 'CART_EMPTY' | 'CART_HAS_ISSUES' | 'MENU_NOT_LOADED' | 'TABLE_REQUIRED' | 'TABLE_EXPIRED' | 'BUSY';
+export type SubmitBlocker =
+  | 'CART_EMPTY'
+  | 'CART_HAS_ISSUES'
+  | 'MENU_NOT_LOADED'
+  | 'TABLE_REQUIRED'
+  | 'TABLE_EXPIRED'
+  | 'ORDER_TYPE_DISABLED'
+  | 'PAYMENT_METHOD_UNAVAILABLE'
+  | 'BELOW_MINIMUM'
+  | 'BUSY';
 
 export interface SubmitResult {
   fieldErrors: Partial<Record<CheckoutField, string>>;
   blocker: SubmitBlocker | null;
 }
-
-const ATTEMPT_KEY = 'inbyte_checkout_attempt_v1';
 
 function phaseForError(code: CafeErrorCode, outcomeUnknown: boolean): CheckoutPhase {
   if (outcomeUnknown) return 'FAILED';
@@ -70,22 +79,6 @@ function phaseForError(code: CafeErrorCode, outcomeUnknown: boolean): CheckoutPh
   }
 }
 
-/**
- * Dine-in snapshots carry the table token, so they live in sessionStorage with
- * the table session itself and never outlive the QR visit. Outside orders use
- * localStorage so a lost response can still be retried after a browser restart.
- */
-function storageAreaFor(attempt: CheckoutAttempt): 'local' | 'session' {
-  return attempt.request.orderType === 'DINE_IN' ? 'session' : 'local';
-}
-
-export function loadStoredAttempt(): CheckoutAttempt | null {
-  const dineIn = sanitizeStoredAttempt(readJson(ATTEMPT_KEY, 'session'));
-  if (dineIn && dineIn.request.orderType === 'DINE_IN') return dineIn;
-  const outside = sanitizeStoredAttempt(readJson(ATTEMPT_KEY, 'local'));
-  return outside && outside.request.orderType !== 'DINE_IN' ? outside : null;
-}
-
 /** An attempt whose result Café never confirmed (lost response, crash, offline...). */
 export function isUnresolved(attempt: CheckoutAttempt | null): attempt is CheckoutAttempt {
   return attempt !== null && (attempt.status === 'OUTCOME_UNKNOWN' || attempt.status === 'PENDING_SEND');
@@ -95,11 +88,16 @@ export function useCheckout() {
   const cart = useCart();
   const { index, reload: reloadCatalog } = useCatalog();
   const orderCtx = useOrderContext();
+  const { tenant, scope } = useTenant();
+  // Attempts (and their clientRequestIds) live in this café's scope only.
+  const attemptStore = useMemo(() => createCheckoutAttemptStore(scope), [scope]);
+  const loadStoredAttempt = attemptStore.load;
+  const orders = useMemo(() => trackedOrdersStore(scope), [scope]);
 
-  const [attempt, setAttemptState] = useState<CheckoutAttempt | null>(() => loadStoredAttempt());
+  const [attempt, setAttemptState] = useState<CheckoutAttempt | null>(() => attemptStore.load());
   const [state, setState] = useState<CheckoutState>(() => ({
-    phase: isUnresolved(loadStoredAttempt()) ? 'FAILED' : 'IDLE',
-    errorCode: isUnresolved(loadStoredAttempt()) ? 'UNKNOWN' : null,
+    phase: isUnresolved(attemptStore.load()) ? 'FAILED' : 'IDLE',
+    errorCode: isUnresolved(attemptStore.load()) ? 'UNKNOWN' : null,
     acknowledgement: null,
     trackedOrder: null,
     lastRequestId: null,
@@ -107,12 +105,13 @@ export function useCheckout() {
   }));
   const inFlight = useRef(false);
 
-  const persistAttempt = useCallback((next: CheckoutAttempt | null) => {
-    removeKey(ATTEMPT_KEY, 'local');
-    removeKey(ATTEMPT_KEY, 'session');
-    if (next) writeJson(ATTEMPT_KEY, next, storageAreaFor(next));
-    setAttemptState(next);
-  }, []);
+  const persistAttempt = useCallback(
+    (next: CheckoutAttempt | null) => {
+      attemptStore.save(next);
+      setAttemptState(next);
+    },
+    [attemptStore]
+  );
 
   /** Snapshot of what the customer asked for, for the device-local tracking view. */
   const describeItems = useCallback(
@@ -146,19 +145,20 @@ export function useCheckout() {
       }));
 
       try {
-        const ack = await submitOrder(sending.request);
+        const ack = await submitOrder(scope, sending.request);
         const { clientRequestId: _id, ...draft } = sending.request;
         const tracked: TrackedOrder = {
+          tenantId: scope.tenantId,
           publicReference: ack.publicReference,
           orderNumber: ack.orderNumber,
           orderType: sending.request.orderType,
           tableLabel: sending.request.orderType === 'DINE_IN' ? orderCtx.table?.tableLabel ?? null : null,
           paymentMethod: sending.request.paymentMethod,
-          acknowledgedTotalCents: ack.totalCents,
+          acknowledgedTotalCents: ack.totalCents ?? ack.estimatedTotalCents,
           placedAt: ack.createdAt ?? new Date().toISOString(),
           items: describeItems(draft)
         };
-        addTrackedOrder(tracked);
+        orders.add(tracked);
         // Acknowledged: this id is finished and must never be reused.
         persistAttempt(null);
         if (clearCartOnSuccess) cart.clear();
@@ -183,7 +183,7 @@ export function useCheckout() {
         inFlight.current = false;
       }
     },
-    [cart, describeItems, orderCtx, persistAttempt, reloadCatalog]
+    [cart, describeItems, orderCtx, persistAttempt, reloadCatalog, scope, orders]
   );
 
   const submit = useCallback(
@@ -195,6 +195,11 @@ export function useCheckout() {
       if (cart.hasIssues) return { ...none, blocker: 'CART_HAS_ISSUES' };
 
       const { orderType, table } = orderCtx;
+      if (!orderCtx.orderTypeEnabled) return { ...none, blocker: 'ORDER_TYPE_DISABLED' };
+      if (!meetsMinimumOrder(tenant, cart.estimatedTotalCents)) return { ...none, blocker: 'BELOW_MINIMUM' };
+      if (!offeredPaymentMethods(tenant).includes(form.paymentMethod)) {
+        return { ...none, blocker: 'PAYMENT_METHOD_UNAVAILABLE' };
+      }
       if (orderType === 'DINE_IN') {
         if (!table) return { ...none, blocker: 'TABLE_REQUIRED' };
         if (orderCtx.isTableExpired()) return { ...none, blocker: 'TABLE_EXPIRED' };
@@ -210,11 +215,11 @@ export function useCheckout() {
         customer: values,
         expectedTotalCents: cart.estimatedTotalCents
       });
-      const { attempt: next, reused } = resolveAttempt(loadStoredAttempt(), draft);
+      const { attempt: next, reused } = resolveAttempt(loadStoredAttempt(), draft, { tenantId: scope.tenantId });
       await send(next, reused, true);
       return none;
     },
-    [cart, index, orderCtx, send]
+    [cart, index, orderCtx, send, tenant, scope, loadStoredAttempt]
   );
 
   /**
@@ -238,7 +243,7 @@ export function useCheckout() {
     );
     await send(stored, true, sentItems === currentItems);
     return null;
-  }, [cart.lines, orderCtx, send]);
+  }, [cart.lines, orderCtx, send, loadStoredAttempt]);
 
   const resetToIdle = useCallback(() => {
     setState((s) => ({ ...s, phase: 'IDLE', errorCode: null, acknowledgement: null, trackedOrder: null }));

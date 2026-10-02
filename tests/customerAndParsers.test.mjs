@@ -65,11 +65,33 @@ test('acknowledgement and status parsers reject unknown states and drop extras',
     publicReference: 'ord_abc', orderNumber: 'ORD-1001', orderStatus: 'PENDING', paymentStatus: 'PENDING',
     totalCents: 5500, cashierName: 'Ali', shiftId: 3, customerPhone: '0100'
   });
-  assert.deepEqual(Object.keys(ack).sort(), ['createdAt', 'discountCents', 'orderNumber', 'orderStatus', 'paymentStatus', 'publicReference', 'replayed', 'subtotalCents', 'totalCents']);
+  assert.deepEqual(Object.keys(ack).sort(), ['createdAt', 'deliveryState', 'discountCents', 'estimatedTotalCents', 'orderNumber', 'orderStatus', 'paymentStatus', 'publicReference', 'replayed', 'subtotalCents', 'totalCents']);
+  // A synchronous integration that returns an order number has already delivered the order.
+  assert.equal(ack.deliveryState, 'RECEIVED_BY_CAFE');
   assert.throws(() => parseAcknowledgement({ publicReference: 'x', orderNumber: 'y', orderStatus: 'PAID_BY_WEBSITE', paymentStatus: 'PENDING', totalCents: 1 }),
     (e) => e instanceof CafeIntegrationError && e.code === 'INVALID_RESPONSE');
   const snap = parseStatusSnapshot({ publicReference: 'ord_abc', orderNumber: 'ORD-1001', orderStatus: 'REJECTED', paymentStatus: 'PENDING', rejectionReason: 'نفد الصنف' });
   assert.equal(snap.rejectionReason, 'نفد الصنف');
+});
+
+test('platform acknowledgement: no order number or authoritative total until Café has the order', () => {
+  const ack = parseAcknowledgement({
+    tenantId: 'cafe-a', publicReference: 'INB-AAAA-BBBB-CCCC-DDDD', orderNumber: null, orderStatus: 'PENDING', paymentStatus: 'PENDING',
+    deliveryState: 'AWAITING_CAFE', estimatedTotalCents: 13000, subtotalCents: null, discountCents: null, totalCents: null, replayed: false
+  });
+  assert.equal(ack.orderNumber, null);
+  assert.equal(ack.totalCents, null);
+  assert.equal(ack.discountCents, null);
+  assert.equal(ack.estimatedTotalCents, 13000);
+  assert.equal(ack.deliveryState, 'AWAITING_CAFE');
+  const snap = parseStatusSnapshot({
+    publicReference: 'INB-AAAA-BBBB-CCCC-DDDD', orderNumber: null, orderType: 'PICKUP', orderStatus: 'CANCELLED', paymentStatus: 'PENDING',
+    deliveryState: 'NOT_DELIVERED', estimatedTotalCents: 13000, totalCents: null
+  });
+  assert.equal(snap.deliveryState, 'NOT_DELIVERED');
+  assert.equal(snap.orderNumber, null);
+  // Unknown delivery states fall back to what the order number implies, never to "received".
+  assert.equal(parseStatusSnapshot({ publicReference: 'x', orderStatus: 'PENDING', paymentStatus: 'PENDING', deliveryState: 'TELEPORTED' }).deliveryState, 'AWAITING_CAFE');
 });
 
 test('Café zone-less timestamps are read as UTC', () => {

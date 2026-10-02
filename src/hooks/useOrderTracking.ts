@@ -1,14 +1,18 @@
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { OrderStatusSnapshot } from '../types/order';
 import { appConfig } from '../config/env';
 import type { CafeErrorCode } from '../integration/errors';
 import { toCafeError } from '../integration/errors';
 import { isTerminalStatus } from '../domain/orderStatus';
 import { getOrderStatus } from '../services/cafeTrackingService';
-import { getTrackedOrders, subscribeTrackedOrders } from '../services/trackedOrdersStore';
+import { trackedOrdersStore } from '../services/trackedOrdersStore';
+import { useTenant } from '../tenant/TenantContext';
 
+/** Orders placed on this device at the current café only. */
 export function useTrackedOrders() {
-  return useSyncExternalStore(subscribeTrackedOrders, getTrackedOrders, getTrackedOrders);
+  const { scope } = useTenant();
+  const store = useMemo(() => trackedOrdersStore(scope), [scope]);
+  return useSyncExternalStore(store.subscribe, store.get, store.get);
 }
 
 interface TrackingState {
@@ -23,6 +27,7 @@ interface TrackingState {
  * in progress and the page is visible; stops once Café reports a final state.
  */
 export function useOrderTracking(publicReference: string | null) {
+  const { scope } = useTenant();
   const [state, setState] = useState<TrackingState>({ snapshot: null, loading: false, errorCode: null, lastCheckedAt: null });
   const terminal = state.snapshot ? isTerminalStatus(state.snapshot.orderStatus) : false;
   const failures = useRef(0);
@@ -31,14 +36,15 @@ export function useOrderTracking(publicReference: string | null) {
     if (!publicReference) return;
     setState((s) => ({ ...s, loading: true }));
     try {
-      const snapshot = await getOrderStatus(publicReference);
+      // Looked up within the current café only; another café's reference is unknown here.
+      const snapshot = await getOrderStatus(scope, publicReference);
       failures.current = 0;
       setState({ snapshot, loading: false, errorCode: null, lastCheckedAt: Date.now() });
     } catch (error) {
       failures.current += 1;
       setState((s) => ({ ...s, loading: false, errorCode: toCafeError(error).code, lastCheckedAt: Date.now() }));
     }
-  }, [publicReference]);
+  }, [publicReference, scope]);
 
   useEffect(() => {
     setState({ snapshot: null, loading: false, errorCode: null, lastCheckedAt: null });

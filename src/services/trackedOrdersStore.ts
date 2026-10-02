@@ -1,11 +1,13 @@
-// Device-local list of orders this browser placed, so the customer can find
-// them again. It holds Café's public tracking reference plus a snapshot of what
-// the customer asked for (for display). Status always comes from Café.
+// Device-local list of orders this browser placed at ONE café, so the customer
+// can find them again. It holds the café's public tracking reference plus a
+// snapshot of what the customer asked for (for display). Status always comes
+// from the café. Each café has its own list; records carry their tenantId and
+// any record for another tenant is ignored.
 
 import type { OrderType, PaymentMethod } from '../types/order';
-import { readJson, writeJson } from './storage';
+import type { TenantScope } from '../tenant/tenantScope';
 
-const KEY = 'inbyte_tracked_orders_v1';
+const NAME = 'tracked_orders';
 const MAX_ORDERS = 10;
 
 export interface TrackedOrderItem {
@@ -15,48 +17,67 @@ export interface TrackedOrderItem {
 }
 
 export interface TrackedOrder {
+  tenantId: string;
   publicReference: string;
-  orderNumber: string;
+  /** Café order number once INBYTE Café created the order (null while awaiting the café). */
+  orderNumber: string | null;
   orderType: OrderType;
   tableLabel: string | null;
   paymentMethod: PaymentMethod;
-  /** Café's authoritative total at acknowledgement time. */
-  acknowledgedTotalCents: number;
+  /** Café's authoritative total if known at acknowledgement, otherwise the platform estimate. */
+  acknowledgedTotalCents: number | null;
   placedAt: string;
   items: TrackedOrderItem[];
 }
 
-const listeners = new Set<() => void>();
-let cache: TrackedOrder[] | null = null;
+export interface TrackedOrdersStore {
+  get(): TrackedOrder[];
+  add(order: TrackedOrder): void;
+  subscribe(listener: () => void): () => void;
+}
 
-function isTracked(v: unknown): v is TrackedOrder {
+function isTracked(v: unknown, tenantId: string): v is TrackedOrder {
   if (typeof v !== 'object' || v === null) return false;
   const o = v as Record<string, unknown>;
   return (
+    o.tenantId === tenantId &&
     typeof o.publicReference === 'string' &&
-    typeof o.orderNumber === 'string' &&
+    (typeof o.orderNumber === 'string' || o.orderNumber === null) &&
     typeof o.orderType === 'string' &&
-    typeof o.acknowledgedTotalCents === 'number' &&
+    (typeof o.acknowledgedTotalCents === 'number' || o.acknowledgedTotalCents === null) &&
     Array.isArray(o.items)
   );
 }
 
-export function getTrackedOrders(): TrackedOrder[] {
-  if (cache === null) {
-    const raw = readJson(KEY);
-    cache = Array.isArray(raw) ? raw.filter(isTracked).slice(0, MAX_ORDERS) : [];
-  }
-  return cache;
-}
+const stores = new Map<string, TrackedOrdersStore>();
 
-export function addTrackedOrder(order: TrackedOrder): void {
-  const others = getTrackedOrders().filter((o) => o.publicReference !== order.publicReference);
-  cache = [order, ...others].slice(0, MAX_ORDERS);
-  writeJson(KEY, cache);
-  listeners.forEach((l) => l());
-}
+/** One store per tenant (stable identity, so React can subscribe to it). */
+export function trackedOrdersStore(scope: TenantScope): TrackedOrdersStore {
+  const existing = stores.get(scope.tenantId);
+  if (existing) return existing;
 
-export function subscribeTrackedOrders(listener: () => void): () => void {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
+  const listeners = new Set<() => void>();
+  let cache: TrackedOrder[] | null = null;
+
+  const store: TrackedOrdersStore = {
+    get() {
+      if (cache === null) {
+        const raw = scope.storage.readJson(NAME);
+        cache = Array.isArray(raw) ? raw.filter((o) => isTracked(o, scope.tenantId)).slice(0, MAX_ORDERS) : [];
+      }
+      return cache;
+    },
+    add(order) {
+      if (order.tenantId !== scope.tenantId) return;
+      cache = [order, ...store.get().filter((o) => o.publicReference !== order.publicReference)].slice(0, MAX_ORDERS);
+      scope.storage.writeJson(NAME, cache);
+      listeners.forEach((l) => l());
+    },
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    }
+  };
+  stores.set(scope.tenantId, store);
+  return store;
 }

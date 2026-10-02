@@ -8,9 +8,10 @@ import { formFromAttempt, useCheckout } from '../hooks/useCheckout';
 import type { CheckoutField, CheckoutFormInput } from '../domain/customer';
 import { LIMITS } from '../domain/customer';
 import { findOption } from '../domain/catalogIndex';
-import { formatMoney } from '../domain/pricing';
 import { ORDER_STATUS_PRESENTATION, ORDER_TYPE_LABELS, paymentMethodLabel } from '../domain/orderStatus';
 import { CUSTOMER_ERROR_MESSAGES } from '../integration/errors';
+import { useMoney, useTenant } from '../tenant/TenantContext';
+import { offeredPaymentMethods } from '../tenant/tenantPolicy';
 import type { PaymentMethod } from '../types/order';
 
 const BLOCKER_TEXT: Record<SubmitBlocker, string> = {
@@ -19,6 +20,9 @@ const BLOCKER_TEXT: Record<SubmitBlocker, string> = {
   MENU_NOT_LOADED: 'لم يتم تحميل المنيو من الكافيه بعد. حاول بعد لحظات.',
   TABLE_REQUIRED: 'الطلب من الطاولة يحتاج مسح كود QR الموجود على طاولتك.',
   TABLE_EXPIRED: 'انتهت جلسة الطاولة. امسح كود QR الموجود على طاولتك مرة أخرى.',
+  ORDER_TYPE_DISABLED: 'هذا النوع من الطلبات غير متاح في هذا المقهى حالياً.',
+  PAYMENT_METHOD_UNAVAILABLE: 'طريقة الدفع المختارة غير متاحة في هذا المقهى.',
+  BELOW_MINIMUM: 'إجمالي الطلب أقل من الحد الأدنى للطلب في هذا المقهى.',
   BUSY: 'جارٍ إرسال طلبك بالفعل...'
 };
 
@@ -30,17 +34,31 @@ const NEEDS_CART_REVIEW: ReadonlySet<CheckoutPhase> = new Set<CheckoutPhase>([
   'INVALID_MODIFIER'
 ]);
 
-const EMPTY_FORM: CheckoutFormInput = { fullName: '', phone: '', deliveryAddress: '', notes: '', paymentMethod: 'CASH' };
+const emptyForm = (paymentMethod: PaymentMethod): CheckoutFormInput => ({
+  fullName: '',
+  phone: '',
+  deliveryAddress: '',
+  notes: '',
+  paymentMethod
+});
 
 export const CheckoutPage: React.FC = () => {
+  const money = useMoney();
   const { setActiveTab, showToast } = useUI();
   const cart = useCart();
   const { index } = useCatalog();
   const { orderType, table } = useOrderContext();
   const checkout = useCheckout();
   const { state } = checkout;
+  const { tenant } = useTenant();
+  // Only methods this café accepts AND the website can handle (cash/card at handover).
+  const paymentMethods = offeredPaymentMethods(tenant);
+  const defaultPayment: PaymentMethod = paymentMethods[0] ?? 'CASH';
+  const minimumOrder = tenant.ordering.minimumOrderCents;
 
-  const [form, setForm] = useState<CheckoutFormInput>(() => formFromAttempt(checkout.attempt, 'CASH') ?? EMPTY_FORM);
+  const [form, setForm] = useState<CheckoutFormInput>(
+    () => formFromAttempt(checkout.attempt, defaultPayment) ?? emptyForm(defaultPayment)
+  );
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<CheckoutField, string>>>({});
   const [blocker, setBlocker] = useState<SubmitBlocker | null>(null);
 
@@ -66,30 +84,40 @@ export const CheckoutPage: React.FC = () => {
   if ((state.phase === 'RECEIVED' || state.phase === 'SUCCESS') && state.acknowledgement && state.trackedOrder) {
     const ack = state.acknowledgement;
     const status = ORDER_STATUS_PRESENTATION[ack.orderStatus];
+    const awaitingCafe = ack.deliveryState === 'AWAITING_CAFE';
+    const finalTotal = ack.totalCents !== null;
     return (
       <main className="page-content" style={{ paddingBottom: '6rem' }}>
         <div className="content-inner">
           <section className="checkout-result-card is-success" id="order-confirmation" aria-live="polite">
-            <span className="material-symbols-outlined checkout-result-icon" aria-hidden="true">mark_email_read</span>
-            <h1>وصل طلبك إلى الكافيه</h1>
-            <p className="checkout-result-sub">{status.description}</p>
+            <span className="material-symbols-outlined checkout-result-icon" aria-hidden="true">{awaitingCafe ? 'schedule_send' : 'mark_email_read'}</span>
+            <h1 id="confirmation-title" data-delivery={ack.deliveryState}>{awaitingCafe ? 'تم استلام طلبك — بانتظار الكافيه' : 'وصل طلبك إلى الكافيه'}</h1>
+            <p className="checkout-result-sub">
+              {awaitingCafe
+                ? 'طلبك محفوظ وفي الطريق إلى نظام الكافيه. سيظهر رقم الطلب والإجمالي النهائي بمجرد أن يستلمه الكافيه — تابع الحالة من صفحة التتبع.'
+                : status.description}
+            </p>
 
             <dl className="checkout-result-facts">
               <div>
                 <dt>رقم الطلب</dt>
-                <dd id="confirmation-order-number">{ack.orderNumber}</dd>
+                <dd id="confirmation-order-number">{ack.orderNumber ?? 'يصدر من الكافيه عند الاستلام'}</dd>
               </div>
               <div>
                 <dt>الحالة</dt>
                 <dd id="confirmation-order-status">{status.label}</dd>
               </div>
               <div>
-                <dt>الإجمالي (من الكافيه)</dt>
-                <dd id="confirmation-total">{formatMoney(ack.totalCents)}</dd>
+                <dt>{finalTotal ? 'الإجمالي (من الكافيه)' : 'الإجمالي التقديري'}</dt>
+                <dd id="confirmation-total">{money(finalTotal ? ack.totalCents : ack.estimatedTotalCents)}</dd>
               </div>
               <div>
                 <dt>طريقة الدفع</dt>
                 <dd>{paymentMethodLabel(state.trackedOrder.paymentMethod, state.trackedOrder.orderType)}</dd>
+              </div>
+              <div>
+                <dt>رقم التتبع</dt>
+                <dd id="confirmation-reference" dir="ltr">{ack.publicReference}</dd>
               </div>
               {state.trackedOrder.tableLabel && (
                 <div>
@@ -112,7 +140,7 @@ export const CheckoutPage: React.FC = () => {
               style={{ width: '100%', justifyContent: 'center' }}
               onClick={() => {
                 checkout.resetToIdle();
-                setForm(EMPTY_FORM);
+                setForm(emptyForm(defaultPayment));
                 setActiveTab('menu');
               }}
             >
@@ -159,7 +187,7 @@ export const CheckoutPage: React.FC = () => {
         </div>
 
         {/* Order type (read-only here) */}
-        <div style={{ background: 'var(--surface-container-high)', border: '1px solid rgba(244, 189, 97, 0.25)', borderRadius: '16px', padding: '0.85rem 1rem', display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+        <div style={{ background: 'var(--surface-container-high)', border: '1px solid rgba(var(--brand-rgb), 0.25)', borderRadius: '16px', padding: '0.85rem 1rem', display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
           <span className="material-symbols-outlined" style={{ color: 'var(--primary)', fontSize: '22px' }}>
             {orderType === 'DINE_IN' ? 'table_restaurant' : orderType === 'PICKUP' ? 'store' : 'two_wheeler'}
           </span>
@@ -300,7 +328,7 @@ export const CheckoutPage: React.FC = () => {
             <div className="checkout-box">
               <h3 style={{ fontSize: '15px', fontWeight: 800 }}>طريقة الدفع:</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }} role="radiogroup">
-                {(['CASH', 'CREDIT_CARD'] as PaymentMethod[]).map((method) => (
+                {paymentMethods.map((method) => (
                   <label key={method} className={`payment-option ${form.paymentMethod === method ? 'is-selected' : ''}`}>
                     <input
                       type="radio"
@@ -334,16 +362,19 @@ export const CheckoutPage: React.FC = () => {
                     <span>
                       {line.quantity}× {product?.name ?? 'صنف'} {options ? `(${options})` : ''}
                     </span>
-                    <span style={{ fontWeight: 700, flexShrink: 0 }}>{formatMoney(estimatedCents)}</span>
+                    <span style={{ fontWeight: 700, flexShrink: 0 }}>{money(estimatedCents)}</span>
                   </div>
                 );
               })}
 
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '16px', fontWeight: 800, color: 'var(--primary)', paddingTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
                 <span>الإجمالي التقديري:</span>
-                <span id="checkout-estimated-total">{formatMoney(cart.estimatedTotalCents)}</span>
+                <span id="checkout-estimated-total">{money(cart.estimatedTotalCents)}</span>
               </div>
               <p className="summary-note">يؤكد الكافيه الإجمالي النهائي عند استلام الطلب. إذا تغيرت الأسعار سنطلب منك المراجعة قبل الإرسال.</p>
+              {minimumOrder !== null && (
+                <p className="summary-note" id="checkout-minimum-note">الحد الأدنى للطلب: {money(minimumOrder)}</p>
+              )}
 
               <button
                 type="submit"

@@ -73,17 +73,22 @@
   --canvas-deep:               #120F0D;
   --surface-raised:            #1C1714;
   --surface-overlay:           #28211C;
-  --border-glow:               rgba(200, 150, 62, 0.22);
+  --border-glow:               rgba(var(--brand-deep-rgb), 0.22);
   --text-primary:              #F4EDE4;
   --text-muted:                #A69688;
   --amber-gold:                #C8963E;
+  /* Brand colour channels (r, g, b). Overridden at runtime by the tenant theme. */
+  --brand-rgb:                 244, 189, 97;
+  --brand-deep-rgb:            200, 150, 62;
+  /* Text/icon colour on brand-coloured backgrounds. */
+  --on-brand:                  #120F0D;
   --toasted-kraft:             #D4A373;
   --foliage-green:             #586F56;
   --color-white:               #ffffff;
 
   /* — Status Lifecycle Tokens — */
   --status-pending:            var(--primary);
-  --status-pending-bg:         rgba(244, 189, 97, 0.15);
+  --status-pending-bg:         rgba(var(--brand-rgb), 0.15);
   --status-accepted:           var(--tertiary);
   --status-accepted-bg:        rgba(88, 111, 86, 0.2);
   --status-preparing:          var(--secondary);
@@ -94,16 +99,16 @@
   --status-completed-bg:       rgba(76, 175, 80, 0.25);
 
   /* — Elevation Shadows — */
-  --shadow-tier1:              0 4px 16px -2px rgba(0, 0, 0, 0.4), 0 0 12px 1px rgba(200, 150, 62, 0.06);
-  --shadow-tier2:              0 12px 32px -4px rgba(0, 0, 0, 0.6), 0 0 20px 2px rgba(200, 150, 62, 0.08);
-  --shadow-tier3:              0 24px 48px -8px rgba(0, 0, 0, 0.7), 0 0 32px 4px rgba(200, 150, 62, 0.1);
-  --shadow-glow-primary:       0 4px 16px rgba(244, 189, 97, 0.25);
-  --shadow-glow-small:         0 0 10px rgba(244, 189, 97, 0.7);
+  --shadow-tier1:              0 4px 16px -2px rgba(0, 0, 0, 0.4), 0 0 12px 1px rgba(var(--brand-deep-rgb), 0.06);
+  --shadow-tier2:              0 12px 32px -4px rgba(0, 0, 0, 0.6), 0 0 20px 2px rgba(var(--brand-deep-rgb), 0.08);
+  --shadow-tier3:              0 24px 48px -8px rgba(0, 0, 0, 0.7), 0 0 32px 4px rgba(var(--brand-deep-rgb), 0.1);
+  --shadow-glow-primary:       0 4px 16px rgba(var(--brand-rgb), 0.25);
+  --shadow-glow-small:         0 0 10px rgba(var(--brand-rgb), 0.7);
 
   /* — Card Borders — */
-  --border-card:               1px solid rgba(200, 150, 62, 0.16);
-  --border-card-hover:         1px solid rgba(200, 150, 62, 0.35);
-  --border-brass:              1px solid rgba(200, 150, 62, 0.22);
+  --border-card:               1px solid rgba(var(--brand-deep-rgb), 0.16);
+  --border-card-hover:         1px solid rgba(var(--brand-deep-rgb), 0.35);
+  --border-brass:              1px solid rgba(var(--brand-deep-rgb), 0.22);
 
   /* — Glassmorphism — */
   --glass-bg:                  rgba(22, 18, 15, 0.88);
@@ -116,7 +121,7 @@
   --ff-arabic:                 'Cairo', sans-serif;
 
   /* — Scroll Thumb — */
-  --scrollbar-thumb:           rgba(200, 150, 62, 0.3);
+  --scrollbar-thumb:           rgba(var(--brand-deep-rgb), 0.3);
   --scrollbar-track:           transparent;
 }
 
@@ -182,24 +187,27 @@
   --canvas-deep:               #FDFBF7;
   --surface-raised:            #FFFFFF;
   --surface-overlay:           #F7F2EB;
-  --border-glow:               rgba(179, 120, 36, 0.28);
+  --border-glow:               rgba(var(--brand-rgb), 0.28);
   --text-primary:              #1B120C;
   --text-muted:                #685446;
   --amber-gold:                #B37824;
+  --brand-rgb:                 179, 120, 36;
+  --brand-deep-rgb:            150, 95, 37;
+  --on-brand:                  #FFFFFF;
   --toasted-kraft:             #C9945B;
   --foliage-green:             #5D7053;
 
   /* — Elevation Shadows — */
   --shadow-tier1:              0 4px 20px -2px rgba(45, 25, 10, 0.06), 0 1px 4px rgba(45, 25, 10, 0.03);
-  --shadow-tier2:              0 12px 32px -4px rgba(45, 25, 10, 0.09), 0 3px 12px rgba(179, 120, 36, 0.08);
-  --shadow-tier3:              0 24px 48px -8px rgba(45, 25, 10, 0.12), 0 0 32px 4px rgba(179, 120, 36, 0.1);
-  --shadow-glow-primary:       0 4px 18px rgba(179, 120, 36, 0.3);
-  --shadow-glow-small:         0 0 12px rgba(179, 120, 36, 0.4);
+  --shadow-tier2:              0 12px 32px -4px rgba(45, 25, 10, 0.09), 0 3px 12px rgba(var(--brand-rgb), 0.08);
+  --shadow-tier3:              0 24px 48px -8px rgba(45, 25, 10, 0.12), 0 0 32px 4px rgba(var(--brand-rgb), 0.1);
+  --shadow-glow-primary:       0 4px 18px rgba(var(--brand-rgb), 0.3);
+  --shadow-glow-small:         0 0 12px rgba(var(--brand-rgb), 0.4);
 
   /* — Card Borders — */
-  --border-card:               1px solid rgba(179, 120, 36, 0.15);
-  --border-card-hover:         1px solid rgba(179, 120, 36, 0.45);
-  --border-brass:              1px solid rgba(179, 120, 36, 0.22);
+  --border-card:               1px solid rgba(var(--brand-rgb), 0.15);
+  --border-card-hover:         1px solid rgba(var(--brand-rgb), 0.45);
+  --border-brass:              1px solid rgba(var(--brand-rgb), 0.22);
 
   /* — Glassmorphism — */
   --glass-bg:                  rgba(253, 251, 247, 0.88);
@@ -213,7 +221,7 @@
 
   /* — Status Lifecycle Tokens (Light) — */
   --status-pending:            var(--primary);
-  --status-pending-bg:         rgba(179, 120, 36, 0.12);
+  --status-pending-bg:         rgba(var(--brand-rgb), 0.12);
   --status-accepted:           var(--tertiary);
   --status-accepted-bg:        rgba(93, 112, 83, 0.15);
   --status-preparing:          var(--secondary);

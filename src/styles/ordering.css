@@ -30,7 +30,7 @@
   border-radius: var(--radius-md);
   padding: 0.35rem 1rem;
   background: repeating-linear-gradient(-45deg, #3a2a10, #3a2a10 10px, #2c200c 10px, #2c200c 20px);
-  color: #f4bd61;
+  color: rgb(var(--brand-rgb));
   font-family: var(--ff-arabic);
   font-size: 11.5px;
   font-weight: 700;
@@ -50,7 +50,7 @@
   padding: 0.6rem 0.85rem;
   border-radius: var(--radius-lg);
   background: var(--surface-container-high);
-  border: 1px solid rgba(244, 189, 97, 0.25);
+  border: 1px solid rgba(var(--brand-rgb), 0.25);
   color: var(--on-surface);
   font-family: var(--ff-arabic);
   font-size: 12.5px;
@@ -64,7 +64,7 @@
 .inline-notice-action {
   margin-inline-start: auto;
   background: transparent;
-  border: 1px solid rgba(200, 150, 62, 0.4);
+  border: 1px solid rgba(var(--brand-deep-rgb), 0.4);
   color: var(--primary);
   border-radius: var(--radius-full);
   padding: 0.25rem 0.75rem;
@@ -105,13 +105,13 @@
   font-size: 12.5px;
   line-height: 1.55;
   background: var(--surface-container-high);
-  border: 1px solid rgba(244, 189, 97, 0.3);
+  border: 1px solid rgba(var(--brand-rgb), 0.3);
   color: var(--on-surface);
 }
 .inline-notice .material-symbols-outlined { font-size: 18px; flex-shrink: 0; color: var(--primary); }
 .inline-notice.is-error { border-color: var(--error); }
 .inline-notice.is-error .material-symbols-outlined { color: var(--error); }
-.inline-notice.is-warning { border-color: rgba(244, 189, 97, 0.55); }
+.inline-notice.is-warning { border-color: rgba(var(--brand-rgb), 0.55); }
 
 /* ---------- Product cards ---------- */
 .product-card-image {
@@ -176,14 +176,14 @@
   border-color: rgba(255, 255, 255, 0.12);
   box-shadow: none;
 }
-.btn-secondary.modifier-option:hover { background: rgba(200, 150, 62, 0.1); color: var(--on-surface); }
+.btn-secondary.modifier-option:hover { background: rgba(var(--brand-deep-rgb), 0.1); color: var(--on-surface); }
 .btn-secondary.modifier-option.is-active {
-  background: rgba(200, 150, 62, 0.18);
+  background: rgba(var(--brand-deep-rgb), 0.18);
   border-color: var(--primary);
   color: var(--primary);
 }
 [data-theme="light"] .btn-secondary.modifier-option { background: transparent; border-color: rgba(0, 0, 0, 0.12); }
-[data-theme="light"] .btn-secondary.modifier-option.is-active { background: rgba(179, 120, 36, 0.12); border-color: var(--primary); color: var(--primary); }
+[data-theme="light"] .btn-secondary.modifier-option.is-active { background: rgba(var(--brand-rgb), 0.12); border-color: var(--primary); color: var(--primary); }
 .modifier-option-price { font-size: 11px; color: var(--on-surface-variant); white-space: nowrap; }
 .modal-add-to-cart-cta[aria-disabled="true"] { opacity: 0.55; }
 /* No hover lift while the button is unavailable (it still reacts to taps to show what is missing). */
@@ -237,9 +237,9 @@
   border: 1px solid rgba(255, 255, 255, 0.08);
   cursor: pointer;
 }
-.payment-option.is-selected { background: rgba(200, 150, 62, 0.18); border-color: var(--primary); }
+.payment-option.is-selected { background: rgba(var(--brand-deep-rgb), 0.18); border-color: var(--primary); }
 [data-theme="light"] .payment-option { background: #F7F2EB; border-color: rgba(0, 0, 0, 0.08); }
-[data-theme="light"] .payment-option.is-selected { background: rgba(179, 120, 36, 0.12); border-color: var(--primary); }
+[data-theme="light"] .payment-option.is-selected { background: rgba(var(--brand-rgb), 0.12); border-color: var(--primary); }
 .btn-primary:disabled { opacity: 0.55; cursor: not-allowed; filter: grayscale(0.2); }
 
 /* ---------- Checkout status / result ---------- */
@@ -253,7 +253,7 @@
   font-size: 13px;
   line-height: 1.6;
   background: var(--surface-container-high);
-  border: 1px solid rgba(244, 189, 97, 0.45);
+  border: 1px solid rgba(var(--brand-rgb), 0.45);
   color: var(--on-surface);
 }
 .checkout-status-panel.is-error { border-color: var(--error); }
@@ -341,4 +341,90 @@
   color: var(--on-surface);
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
-.tracked-orders-switcher .cat-chip.is-selected { background: var(--primary); color: #120F0D; border-color: var(--primary); }
+.tracked-orders-switcher .cat-chip.is-selected { background: var(--primary); color: var(--on-brand); border-color: var(--primary); }
+
+/* ---------- Tenant brand + platform screens ---------- */
+.brand-logo {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+.tenant-screen {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 2rem 1.25rem;
+  text-align: center;
+  font-family: var(--ff-arabic);
+  background: var(--background);
+  color: var(--on-surface-variant);
+}
+.tenant-screen h1 { color: var(--on-surface); font-size: 20px; font-weight: 800; }
+.tenant-screen p { max-width: 24rem; line-height: 1.7; font-size: 13.5px; }
+.tenant-screen-icon { font-size: 46px; color: var(--primary); }
+
+/* ---- Café content configured in the INBYTE Admin ---- */
+.table-session-banner.is-info {
+  background: rgba(var(--brand-rgb), 0.12);
+  border-color: rgba(var(--brand-rgb), 0.35);
+}
+
+.tenant-promotions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+  gap: 0.85rem;
+  margin: 1.25rem 0;
+}
+
+.tenant-promo-card {
+  display: flex;
+  gap: 0.85rem;
+  align-items: center;
+  background: var(--surface-container);
+  border: 1px solid rgba(var(--brand-rgb), 0.18);
+  border-radius: 16px;
+  padding: 0.9rem;
+}
+
+.tenant-promo-card img {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+
+.tenant-promo-card h2 {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--on-surface);
+}
+
+.tenant-promo-card p {
+  font-size: 12.5px;
+  color: var(--on-surface-variant);
+  margin-top: 0.25rem;
+  line-height: 1.5;
+}
+
+.tenant-footer-text {
+  text-align: center;
+  font-size: 12px;
+  color: var(--on-surface-variant);
+  margin: 1.5rem 0 0.5rem;
+}
+
+.product-featured-tag {
+  flex-shrink: 0;
+  font-size: 10.5px;
+  font-weight: 800;
+  padding: 0.15rem 0.5rem;
+  border-radius: 9999px;
+  background: rgba(var(--brand-rgb), 0.18);
+  color: var(--primary);
+}

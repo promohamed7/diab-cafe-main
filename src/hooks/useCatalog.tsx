@@ -4,6 +4,7 @@ import { buildCatalogIndex } from '../domain/catalogIndex';
 import type { CafeErrorCode } from '../integration/errors';
 import { toCafeError } from '../integration/errors';
 import { getCatalog, readCachedCatalog } from '../services/cafeCatalogService';
+import { useTenant } from '../tenant/TenantContext';
 
 export type CatalogStatus = 'loading' | 'ready' | 'error';
 
@@ -19,8 +20,10 @@ interface CatalogContextValue {
 const CatalogContext = createContext<CatalogContextValue | null>(null);
 
 export const CatalogProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // The catalog always belongs to the current café; its cache is stored in the café's own scope.
+  const { scope } = useTenant();
   const [state, setState] = useState<Omit<CatalogContextValue, 'reload'>>(() => {
-    const cached = readCachedCatalog();
+    const cached = readCachedCatalog(scope);
     return cached
       ? { status: 'ready', index: buildCatalogIndex(cached.catalog), source: 'cache', errorCode: null }
       : { status: 'loading', index: null, source: null, errorCode: null };
@@ -31,7 +34,7 @@ export const CatalogProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const seq = ++requestSeq.current;
     setState((s) => (s.index ? s : { ...s, status: 'loading', errorCode: null }));
     try {
-      const result = await getCatalog();
+      const result = await getCatalog(scope);
       if (seq !== requestSeq.current) return;
       setState({ status: 'ready', index: buildCatalogIndex(result.catalog), source: 'live', errorCode: null });
     } catch (error) {
@@ -40,7 +43,7 @@ export const CatalogProvider: React.FC<{ children: React.ReactNode }> = ({ child
       // Keep showing a cached menu if there is one, but flag it as not live.
       setState((s) => (s.index ? { ...s, source: 'cache', errorCode: code } : { status: 'error', index: null, source: null, errorCode: code }));
     }
-  }, []);
+  }, [scope]);
 
   useEffect(() => {
     void reload();

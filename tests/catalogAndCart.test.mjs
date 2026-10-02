@@ -82,9 +82,10 @@ test('toggling respects single vs multi select', () => {
 
 test('display price follows Café rule: base + Σ deltas', () => {
   assert.equal(estimateUnitCents(product(1), [1102, 1203, 1501]), 5000 + 1500 + 1500 + 1500);
-  assert.equal(formatMoney(5500), '55 ج.م');
-  assert.equal(formatMoney(5550), '55.50 ج.م');
-  assert.equal(formatMoney(null), '—');
+  assert.equal(formatMoney(5500, 'ج.م'), '55 ج.م');
+  assert.equal(formatMoney(5550, 'ج.م'), '55.50 ج.م');
+  assert.equal(formatMoney(5500, 'جنيه'), '55 جنيه', 'currency symbol comes from the tenant');
+  assert.equal(formatMoney(null, 'ج.م'), '—');
 });
 
 test('cart stores IDs only, merges identical lines and enforces limits', () => {

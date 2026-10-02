@@ -8,10 +8,17 @@ import type { SubmitOrderRequest } from '../types/order.ts';
 
 export type TransportKind = 'http' | 'mock' | 'unconfigured';
 
+/**
+ * Every call is scoped to exactly one tenant (café). The tenant is an explicit
+ * argument — never ambient state — so a request can't silently go to the wrong
+ * café. The integration side must enforce the same scope (a reference, table
+ * token or idempotency key from one café is unknown to every other café).
+ */
 export interface CafeTransport {
   readonly kind: TransportKind;
-  getCatalog(signal?: AbortSignal): Promise<unknown>;
-  resolveTableToken(token: string, signal?: AbortSignal): Promise<unknown>;
-  submitOrder(request: SubmitOrderRequest, signal?: AbortSignal): Promise<unknown>;
-  getOrderStatus(publicReference: string, signal?: AbortSignal): Promise<unknown>;
+  getTenantConfig(tenantId: string, signal?: AbortSignal): Promise<unknown>;
+  getCatalog(tenantId: string, signal?: AbortSignal): Promise<unknown>;
+  resolveTableToken(tenantId: string, token: string, signal?: AbortSignal): Promise<unknown>;
+  submitOrder(tenantId: string, request: SubmitOrderRequest, signal?: AbortSignal): Promise<unknown>;
+  getOrderStatus(tenantId: string, publicReference: string, signal?: AbortSignal): Promise<unknown>;
 }
