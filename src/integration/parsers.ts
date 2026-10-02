@@ -133,6 +133,7 @@ function parseProduct(raw: unknown): CatalogProduct {
     isActive: bool(p.isActive, true),
     isAvailableOnline: bool(p.isAvailableOnline, true),
     availability: availability(p.availability),
+    isFeatured: p.isFeatured === true,
     modifierGroups: groups
   };
 }

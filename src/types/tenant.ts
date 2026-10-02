@@ -99,6 +99,17 @@ export interface TenantAboutContent {
   sections: TenantAboutSection[];
 }
 
+export interface TenantAnnouncement {
+  text: string;
+  linkUrl: string | null;
+}
+
+export interface TenantPromotion {
+  title: string;
+  text: string | null;
+  imageUrl: string | null;
+}
+
 export interface TenantContent {
   heroBadge: string | null;
   heroTitle: string | null;
@@ -106,6 +117,11 @@ export interface TenantContent {
   heroImageUrl: string | null;
   heroImageMobileUrl: string | null;
   about: TenantAboutContent | null;
+  /** Short banner shown above the page content (e.g. "closed on Friday morning"). */
+  announcement: TenantAnnouncement | null;
+  /** Promotional cards on the home page. Display only — no prices or discounts. */
+  promotions: TenantPromotion[];
+  footerText: string | null;
 }
 
 export interface TenantConfig {

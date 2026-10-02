@@ -11,6 +11,7 @@ import type {
   TenantAboutSection,
   TenantColorSet,
   TenantConfig,
+  TenantPromotion,
   TenantSurfaceSet
 } from '../types/tenant.ts';
 
@@ -129,6 +130,12 @@ function about(v: unknown): TenantAboutContent | null {
   };
 }
 
+function promotion(v: unknown): TenantPromotion | null {
+  if (!isObj(v)) return null;
+  const title = text(v.title, 80);
+  return title ? { title, text: text(v.text, 300), imageUrl: assetUrl(v.imageUrl) } : null;
+}
+
 export function parseTenantConfig(raw: unknown, expectedTenantId: string): TenantConfig {
   if (!isObj(raw)) fail('config must be an object');
 
@@ -205,7 +212,15 @@ export function parseTenantConfig(raw: unknown, expectedTenantId: string): Tenan
       heroSubtitle: text(content.heroSubtitle, 300),
       heroImageUrl: assetUrl(content.heroImageUrl),
       heroImageMobileUrl: assetUrl(content.heroImageMobileUrl),
-      about: about(content.about)
+      about: about(content.about),
+      announcement: isObj(content.announcement) && text(content.announcement.text, 200)
+        ? { text: text(content.announcement.text, 200) as string, linkUrl: linkUrl(content.announcement.linkUrl) }
+        : null,
+      promotions: (Array.isArray(content.promotions) ? content.promotions : [])
+        .map(promotion)
+        .filter((p): p is TenantPromotion => !!p)
+        .slice(0, 6),
+      footerText: text(content.footerText, 300)
     }
   };
 }

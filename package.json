@@ -1,24 +1,42 @@
 {
   "name": "inbyte-cafe-digital-menu",
   "version": "1.0.0",
-  "description": "White-label digital menu and customer ordering channel for cafés using the INBYTE Café POS.",
+  "description": "INBYTE Digital Menu Platform: multi-tenant backend, INBYTE Admin, customer digital menu/ordering and the integration boundary to each café's INBYTE Café POS.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "start": "vite preview",
+    "start": "node server/src/main.ts",
+    "server": "node server/src/main.ts",
+    "server:dev": "node --watch server/src/main.ts",
+    "db:migrate": "node server/src/cli/migrate.ts",
+    "db:seed:dev": "node server/src/cli/devSeed.ts",
+    "admin:create": "node server/src/cli/createAdmin.ts",
+    "tenant:import": "node server/src/cli/importTenant.ts",
+    "dev:connector": "node connector/src/devRunner.ts",
     "typecheck": "tsc --noEmit",
     "test": "node --test \"tests/*.test.mjs\"",
-    "verify": "npm run typecheck && npm test && npm run build"
+    "test:server": "node --test \"server/test/*.test.ts\"",
+    "verify": "npm run typecheck && npm test && npm run test:server && npm run build"
   },
   "dependencies": {
+    "@fastify/cookie": "^11",
+    "@fastify/rate-limit": "^11",
+    "@fastify/static": "^10.1.5",
+    "fastify": "^5.12",
+    "pg": "^8",
+    "qrcode": "^1.5",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "zod": "^4"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=22.18.0"
   },
   "devDependencies": {
+    "@types/node": "^22",
+    "@types/pg": "^8.23.1",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.1",
