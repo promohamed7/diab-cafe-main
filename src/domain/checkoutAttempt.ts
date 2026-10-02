@@ -10,6 +10,9 @@
 //     a NEW id is generated.
 //  5. Once Café acknowledged or definitively rejected an attempt, its id is never
 //     reused for another submission.
+//  6. An attempt belongs to exactly one tenant (café). Its tenantId is part of
+//     the record and of the fingerprint, so it can never be reused, restored or
+//     replayed under another tenant.
 
 import type { CafeId } from '../types/catalog.ts';
 import type { OrderType, SubmitOrderRequest } from '../types/order.ts';
@@ -35,6 +38,8 @@ export interface DraftInput {
 export type AttemptStatus = 'PENDING_SEND' | 'OUTCOME_UNKNOWN' | 'ACKNOWLEDGED' | 'REJECTED';
 
 export interface CheckoutAttempt {
+  /** The café this attempt belongs to. */
+  tenantId: string;
   clientRequestId: string;
   fingerprint: string;
   request: SubmitOrderRequest;
@@ -98,6 +103,11 @@ export function fingerprintDraft(draft: OrderDraft): string {
   return canonicalJson(draft);
 }
 
+/** Fingerprint of an attempt: the payload *and* the tenant it is sent to. */
+export function fingerprintAttempt(tenantId: string, draft: OrderDraft): string {
+  return canonicalJson({ tenantId, draft });
+}
+
 /** RFC 4122 v4 UUID from the platform CSPRNG. Works outside secure contexts too. */
 export function generateRequestId(): string {
   const c = globalThis.crypto;
@@ -116,15 +126,22 @@ export interface ResolvedAttempt {
   reused: boolean;
 }
 
+export interface ResolveAttemptOptions {
+  tenantId: string;
+  newId?: () => string;
+  now?: number;
+}
+
 export function resolveAttempt(
   existing: CheckoutAttempt | null,
   draft: OrderDraft,
-  newId: () => string = generateRequestId,
-  now: number = Date.now()
+  options: ResolveAttemptOptions
 ): ResolvedAttempt {
-  const fingerprint = fingerprintDraft(draft);
+  const { tenantId, newId = generateRequestId, now = Date.now() } = options;
+  const fingerprint = fingerprintAttempt(tenantId, draft);
   const reusable =
     existing !== null &&
+    existing.tenantId === tenantId &&
     existing.fingerprint === fingerprint &&
     (existing.status === 'OUTCOME_UNKNOWN' || existing.status === 'PENDING_SEND') &&
     now - existing.createdAt < ATTEMPT_REUSE_TTL_MS;
@@ -134,6 +151,7 @@ export function resolveAttempt(
   const clientRequestId = newId();
   return {
     attempt: {
+      tenantId,
       clientRequestId,
       fingerprint,
       request: { ...draft, clientRequestId },
@@ -148,10 +166,11 @@ export function resolveAttempt(
 const ATTEMPT_STATUSES: readonly AttemptStatus[] = ['PENDING_SEND', 'OUTCOME_UNKNOWN', 'ACKNOWLEDGED', 'REJECTED'];
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
-/** Restores a persisted attempt; anything malformed is discarded. */
-export function sanitizeStoredAttempt(raw: unknown): CheckoutAttempt | null {
+/** Restores a persisted attempt for `tenantId`; anything malformed or from another tenant is discarded. */
+export function sanitizeStoredAttempt(raw: unknown, tenantId: string): CheckoutAttempt | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const a = raw as Record<string, unknown>;
+  if (a.tenantId !== tenantId) return null;
   if (typeof a.clientRequestId !== 'string' || !UUID_RE.test(a.clientRequestId)) return null;
   if (typeof a.fingerprint !== 'string' || typeof a.createdAt !== 'number') return null;
   if (typeof a.status !== 'string' || !(ATTEMPT_STATUSES as readonly string[]).includes(a.status)) return null;
@@ -159,8 +178,9 @@ export function sanitizeStoredAttempt(raw: unknown): CheckoutAttempt | null {
   const request = a.request as SubmitOrderRequest;
   if (request.clientRequestId !== a.clientRequestId) return null;
   const { clientRequestId: _omit, ...draft } = request;
-  if (fingerprintDraft(draft) !== a.fingerprint) return null;
+  if (fingerprintAttempt(tenantId, draft) !== a.fingerprint) return null;
   return {
+    tenantId,
     clientRequestId: a.clientRequestId,
     fingerprint: a.fingerprint,
     request,

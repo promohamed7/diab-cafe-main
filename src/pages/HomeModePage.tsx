@@ -3,6 +3,8 @@ import { useUI } from '../context/UIContext';
 import { useOrderContext } from '../hooks/useOrderContext';
 import { useCatalog } from '../hooks/useCatalog';
 import type { OutsideOrderType } from '../types/order';
+import { useTenant } from '../tenant/TenantContext';
+import { canAcceptOrders, isDineInEnabled } from '../tenant/tenantPolicy';
 import dineinHero from '../assets/images/dinein-hero.webp';
 import pickupHero from '../assets/images/pickup-hero.webp';
 import deliveryHero from '../assets/images/delivery-hero.webp';
@@ -11,9 +13,20 @@ import heroMobileBannerImage from '../assets/images/hero-banner-mobile.webp';
 
 export const HomeModePage: React.FC = () => {
   const { setActiveTab, setIsHeroTitleDocked, showToast } = useUI();
-  const { table, setOutsideType } = useOrderContext();
+  const { table, setOutsideType, availableOutsideTypes } = useOrderContext();
   const { index } = useCatalog();
+  const { tenant } = useTenant();
+  const { identity, contact, content } = tenant;
+  // Café contact details come from the tenant config, falling back to what the café's POS publishes.
   const store = index?.catalog.store ?? null;
+  const storeName = store?.name || identity.displayName;
+  const phone = contact.phone ?? store?.phone ?? null;
+  const address = contact.address ?? store?.address ?? null;
+  const heroTitle = content.heroTitle ?? identity.displayName;
+  const dineInEnabled = isDineInEnabled(tenant);
+  const pickupEnabled = availableOutsideTypes.includes('PICKUP');
+  const deliveryEnabled = availableOutsideTypes.includes('DELIVERY');
+  const orderingOpen = canAcceptOrders(tenant);
 
   const heroTitleRef = useRef<HTMLHeadingElement | null>(null);
   const flyingTitleRef = useRef<HTMLDivElement | null>(null);
@@ -86,7 +99,7 @@ export const HomeModePage: React.FC = () => {
           targetCenterX = window.innerWidth / 2;
           targetCenterY = headerRect.bottom + 10;
         } else {
-          // On desktop: docks on the RIGHT side of DIAB CAFE
+          // On desktop: docks on the RIGHT side of the café name
           targetCenterX = brandRect.right - 92;
           targetCenterY = brandRect.top + brandRect.height / 2;
         }
@@ -164,7 +177,7 @@ export const HomeModePage: React.FC = () => {
           className="hero-flying-title"
           aria-hidden="true"
         >
-          أين تود الاستمتاع <span className="gold-gradient-text">بقهوتك اليوم؟</span>
+          <span className="gold-gradient-text">{heroTitle}</span>
         </div>
 
         {/* HERO WELCOME SECTION (Original Precise Compact Container with Image) */}
@@ -176,10 +189,10 @@ export const HomeModePage: React.FC = () => {
           {/* Authentic WebP Banner Image (Responsive: Portrait on Mobile, Landscape on Desktop) */}
           <div className="hero-banner-image-container" aria-hidden="true">
             <picture>
-              <source media="(max-width: 640px)" srcSet={heroMobileBannerImage} />
+              <source media="(max-width: 640px)" srcSet={content.heroImageMobileUrl ?? content.heroImageUrl ?? heroMobileBannerImage} />
               <img
-                src={heroBannerImage}
-                alt="أجواء محمصة دياب كافيه"
+                src={content.heroImageUrl ?? heroBannerImage}
+                alt=""
                 className="hero-banner-fit-img"
                 referrerPolicy="no-referrer"
               />
@@ -188,216 +201,231 @@ export const HomeModePage: React.FC = () => {
 
           {/* Center Content: Luxury Badge, Heading & Subtitle */}
           <div className="hero-content" style={{ position: 'relative', zIndex: 10, maxWidth: '640px', margin: '0 auto', textAlign: 'center' }}>
-            <div className="hero-luxury-badge">
-              <span className="badge-sparkle">✦</span>
-              <span>DIAB ARTISANAL ROASTERY • تجربة استثنائية</span>
-              <span className="badge-sparkle">✦</span>
-            </div>
+            {content.heroBadge && (
+              <div className="hero-luxury-badge">
+                <span className="badge-sparkle">✦</span>
+                <span id="hero-badge">{content.heroBadge}</span>
+                <span className="badge-sparkle">✦</span>
+              </div>
+            )}
             <h1 className="hero-title" id="hero-title" ref={heroTitleRef}>
-              أين تود الاستمتاع <span className="gold-gradient-text">بقهوتك اليوم؟</span>
+              <span className="gold-gradient-text">{heroTitle}</span>
             </h1>
-            <p className="hero-subtitle">
-              اختر وسيلتك المفضلة لتصفح المنيو وبدء طلبك بأعلى معايير الجودة والسرعة
-            </p>
+            {content.heroSubtitle && <p className="hero-subtitle">{content.heroSubtitle}</p>}
           </div>
         </section>
 
-        {/* 3 ORDER MODE CARDS */}
+        {!orderingOpen && (
+          <div className="inline-notice is-warning" role="status" id="ordering-closed-notice">
+            <span className="material-symbols-outlined" aria-hidden="true">menu_book</span>
+            <span>الطلب أونلاين غير متاح في {identity.displayName} حالياً — يمكنك تصفح المنيو.</span>
+            <button type="button" className="inline-notice-action" onClick={() => setActiveTab('menu')}>
+              تصفح المنيو
+            </button>
+          </div>
+        )}
+
+        {/* ORDER MODE CARDS — only the journeys this café enables */}
         <div className="order-cards">
           {/* CARD 1: Dine-In QR Table Order */}
-          <article className="order-card animate-entrance" id="card-dinein" onClick={handleDineIn}>
-            <div className="card-image-wrapper">
-              <img
-                className="card-image"
-                src={dineinHero}
-                alt="أجواء كافيه دافئة مع إضاءة أنيقة وماكينة إسبريسو"
-                loading="eager"
-                decoding="async"
-              />
-              <div className="card-image-overlay"></div>
-              <span className="card-badge">
-                <span className="material-symbols-outlined">table_restaurant</span>
-                <span>داخل الفرع</span>
-              </span>
-            </div>
-            <div className="card-body">
-              <h2 className="card-title">
-                <span>طلب من داخل الكافيه</span>
-                <span className="material-symbols-outlined icon-filled" style={{ color: 'var(--primary)' }}>
-                  verified
+          {dineInEnabled && (
+            <article className="order-card animate-entrance" id="card-dinein" onClick={handleDineIn}>
+              <div className="card-image-wrapper">
+                <img
+                  className="card-image"
+                  src={dineinHero}
+                  alt="أجواء كافيه دافئة مع إضاءة أنيقة وماكينة إسبريسو"
+                  loading="eager"
+                  decoding="async"
+                />
+                <div className="card-image-overlay"></div>
+                <span className="card-badge">
+                  <span className="material-symbols-outlined">table_restaurant</span>
+                  <span>داخل الفرع</span>
                 </span>
-              </h2>
-              <p className="card-description">
-                {table
-                  ? `أنت متصل الآن بـ ${table.tableLabel}. تصفح المنيو وأرسل طلبك مباشرة للكافيه.`
-                  : 'جالس على طاولتك؟ امسح كود QR الموجود على الطاولة بكاميرا هاتفك لتفتح المنيو وتطلب مباشرة.'}
-              </p>
-              <div className="card-features">
-                <div className="feature-badge">
-                  <span className="material-symbols-outlined" style={{ color: 'var(--primary)' }}>
-                    qr_code_scanner
-                  </span>
-                  <span>دعم المسح بـ QR</span>
-                </div>
-                <div className="feature-badge">
-                  <span className="material-symbols-outlined" style={{ color: 'var(--secondary)' }}>
-                    menu_book
-                  </span>
-                  <span>تصفح المنيو الكامل</span>
-                </div>
               </div>
-              <button
-                className="btn-primary btn-order-action"
-                id="btn-dinein"
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDineIn();
-                }}
-              >
-                <span>{table ? `متابعة الطلب — ${table.tableLabel}` : 'امسح كود الطاولة للبدء'}</span>
-                <span className="material-symbols-outlined btn-icon-arrow">arrow_back</span>
-              </button>
-            </div>
-          </article>
+              <div className="card-body">
+                <h2 className="card-title">
+                  <span>طلب من داخل الكافيه</span>
+                  <span className="material-symbols-outlined icon-filled" style={{ color: 'var(--primary)' }}>
+                    verified
+                  </span>
+                </h2>
+                <p className="card-description">
+                  {table
+                    ? `أنت متصل الآن بـ ${table.tableLabel}. تصفح المنيو وأرسل طلبك مباشرة للكافيه.`
+                    : 'جالس على طاولتك؟ امسح كود QR الموجود على الطاولة بكاميرا هاتفك لتفتح المنيو وتطلب مباشرة.'}
+                </p>
+                <div className="card-features">
+                  <div className="feature-badge">
+                    <span className="material-symbols-outlined" style={{ color: 'var(--primary)' }}>
+                      qr_code_scanner
+                    </span>
+                    <span>دعم المسح بـ QR</span>
+                  </div>
+                  <div className="feature-badge">
+                    <span className="material-symbols-outlined" style={{ color: 'var(--secondary)' }}>
+                      menu_book
+                    </span>
+                    <span>تصفح المنيو الكامل</span>
+                  </div>
+                </div>
+                <button
+                  className="btn-primary btn-order-action"
+                  id="btn-dinein"
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDineIn();
+                  }}
+                >
+                  <span>{table ? `متابعة الطلب — ${table.tableLabel}` : 'امسح كود الطاولة للبدء'}</span>
+                  <span className="material-symbols-outlined btn-icon-arrow">arrow_back</span>
+                </button>
+              </div>
+            </article>
+          )}
 
           {/* CARD 2: Takeaway / Pickup */}
-          <article className="order-card animate-entrance" id="card-takeaway" onClick={handleTakeaway}>
-            <div className="card-image-wrapper">
-              <img
-                className="card-image"
-                src={pickupHero}
-                alt="أكواب قهوة سفري وأكياس بن محمص جاهزة للاستلام"
-                loading="eager"
-                decoding="async"
-              />
-              <div className="card-image-overlay"></div>
-              <span className="card-badge">
-                <span className="material-symbols-outlined">takeout_dining</span>
-                <span>استلام سريع</span>
-              </span>
-            </div>
-            <div className="card-body">
-              <h2 className="card-title">
-                <span>استلام من الفرع (تيك أواي)</span>
-                <span className="material-symbols-outlined" style={{ color: 'var(--primary)' }}>
-                  store
+          {pickupEnabled && (
+            <article className="order-card animate-entrance" id="card-takeaway" onClick={handleTakeaway}>
+              <div className="card-image-wrapper">
+                <img
+                  className="card-image"
+                  src={pickupHero}
+                  alt="مشروبات سفري جاهزة للاستلام"
+                  loading="eager"
+                  decoding="async"
+                />
+                <div className="card-image-overlay"></div>
+                <span className="card-badge">
+                  <span className="material-symbols-outlined">takeout_dining</span>
+                  <span>استلام سريع</span>
                 </span>
-              </h2>
-              <p className="card-description">
-                اطلب مشروباتك المفضلة مسبقاً واستلمها من الفرع، وادفع عند الاستلام كاش أو بالبطاقة.
-              </p>
-              <div className="card-features">
-                <div className="feature-badge">
-                  <span className="material-symbols-outlined" style={{ color: 'var(--tertiary)' }}>
-                    timer
-                  </span>
-                  <span>طلب مسبق</span>
-                </div>
-                <div className="feature-badge">
-                  <span className="material-symbols-outlined" style={{ color: 'var(--primary)' }}>
-                    bolt
-                  </span>
-                  <span>دون طابور</span>
-                </div>
               </div>
-              <button
-                className="btn-primary btn-order-action"
-                id="btn-takeaway"
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleTakeaway();
-                }}
-              >
-                <span>اطلب تيك أواي واستلم من الفرع</span>
-                <span className="material-symbols-outlined btn-icon-arrow">arrow_back</span>
-              </button>
-            </div>
-          </article>
+              <div className="card-body">
+                <h2 className="card-title">
+                  <span>استلام من الفرع (تيك أواي)</span>
+                  <span className="material-symbols-outlined" style={{ color: 'var(--primary)' }}>
+                    store
+                  </span>
+                </h2>
+                <p className="card-description">
+                  اطلب مشروباتك المفضلة مسبقاً واستلمها من الفرع، وادفع عند الاستلام.
+                </p>
+                <div className="card-features">
+                  <div className="feature-badge">
+                    <span className="material-symbols-outlined" style={{ color: 'var(--tertiary)' }}>
+                      timer
+                    </span>
+                    <span>طلب مسبق</span>
+                  </div>
+                  <div className="feature-badge">
+                    <span className="material-symbols-outlined" style={{ color: 'var(--primary)' }}>
+                      bolt
+                    </span>
+                    <span>دون طابور</span>
+                  </div>
+                </div>
+                <button
+                  className="btn-primary btn-order-action"
+                  id="btn-takeaway"
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleTakeaway();
+                  }}
+                >
+                  <span>اطلب تيك أواي واستلم من الفرع</span>
+                  <span className="material-symbols-outlined btn-icon-arrow">arrow_back</span>
+                </button>
+              </div>
+            </article>
+          )}
 
           {/* CARD 3: Delivery */}
-          <article className="order-card animate-entrance" id="card-delivery" onClick={handleDelivery}>
-            <div className="card-image-wrapper">
-              <img
-                className="card-image"
-                src={deliveryHero}
-                alt="بوكسات توصيل قهوة وبن محمص طازج مجهزة للتوصيل"
-                loading="eager"
-                decoding="async"
-              />
-              <div className="card-image-overlay"></div>
-              <span className="card-badge">
-                <span className="material-symbols-outlined">moped</span>
-                <span>توصيل منزلي وسريع</span>
-              </span>
-            </div>
-            <div className="card-body">
-              <h2 className="card-title">
-                <span>توصيل (Delivery)</span>
-                <span className="material-symbols-outlined" style={{ color: 'var(--primary)' }}>
-                  local_shipping
+          {deliveryEnabled && (
+            <article className="order-card animate-entrance" id="card-delivery" onClick={handleDelivery}>
+              <div className="card-image-wrapper">
+                <img
+                  className="card-image"
+                  src={deliveryHero}
+                  alt="طلب مجهز للتوصيل"
+                  loading="eager"
+                  decoding="async"
+                />
+                <div className="card-image-overlay"></div>
+                <span className="card-badge">
+                  <span className="material-symbols-outlined">moped</span>
+                  <span>توصيل منزلي وسريع</span>
                 </span>
-              </h2>
-              <p className="card-description">
-                تصفح المنيو بالكامل واطلب مشروباتك الساخنة والباردة والحلويات لمكانك أينما كنت بعناية تامة.
-              </p>
-              <div className="card-features">
-                <div className="feature-badge">
-                  <span className="material-symbols-outlined" style={{ color: 'var(--secondary)' }}>
-                    near_me
-                  </span>
-                  <span>متوفر في نفس اليوم</span>
-                </div>
-                <div className="feature-badge">
-                  <span className="material-symbols-outlined" style={{ color: 'var(--primary)' }}>
-                    payments
-                  </span>
-                  <span>الدفع عند الاستلام</span>
-                </div>
               </div>
-              <button
-                className="btn-primary btn-order-action"
-                id="btn-delivery"
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDelivery();
-                }}
-              >
-                <span>طلب دليفري وتوصيل منزلي</span>
-                <span className="material-symbols-outlined btn-icon-arrow">arrow_back</span>
-              </button>
-            </div>
-          </article>
+              <div className="card-body">
+                <h2 className="card-title">
+                  <span>توصيل (Delivery)</span>
+                  <span className="material-symbols-outlined" style={{ color: 'var(--primary)' }}>
+                    local_shipping
+                  </span>
+                </h2>
+                <p className="card-description">
+                  تصفح المنيو بالكامل واطلب مشروباتك الساخنة والباردة والحلويات لمكانك أينما كنت بعناية تامة.
+                </p>
+                <div className="card-features">
+                  <div className="feature-badge">
+                    <span className="material-symbols-outlined" style={{ color: 'var(--secondary)' }}>
+                      near_me
+                    </span>
+                    <span>متوفر في نفس اليوم</span>
+                  </div>
+                  <div className="feature-badge">
+                    <span className="material-symbols-outlined" style={{ color: 'var(--primary)' }}>
+                      payments
+                    </span>
+                    <span>الدفع عند الاستلام</span>
+                  </div>
+                </div>
+                <button
+                  className="btn-primary btn-order-action"
+                  id="btn-delivery"
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDelivery();
+                  }}
+                >
+                  <span>طلب دليفري وتوصيل منزلي</span>
+                  <span className="material-symbols-outlined btn-icon-arrow">arrow_back</span>
+                </button>
+              </div>
+            </article>
+          )}
         </div>
 
         {/* STORE INFO FOOTER STRIP */}
-        <section className="store-info animate-entrance" id="store-info" aria-label="معلومات الفرع">
+        <section className="store-info animate-entrance" id="store-info" aria-label="معلومات المقهى">
           <div className="store-header">
             <div className="store-icon-wrap">
               <span className="material-symbols-outlined icon-md">storefront</span>
             </div>
             <div className="store-details">
               <div className="store-name-row">
-                <span className="store-name">{store?.name || 'فرع سيدي سالم الرئيسي'}</span>
+                <span className="store-name" id="store-name">{storeName}</span>
               </div>
-              <span className="store-hours">يومياً من ٧:٠٠ ص حتى ٢:٠٠ ص (خدمة متواصلة)</span>
-              {store?.address && <span className="store-hours">{store.address}</span>}
-              {store?.phone && (
-                <a className="store-hours" href={`tel:${store.phone}`} style={{ color: 'var(--primary)' }}>
-                  {store.phone}
+              {tenant.businessHoursText && <span className="store-hours" id="store-hours">{tenant.businessHoursText}</span>}
+              {address && <span className="store-hours" id="store-address">{address}</span>}
+              {phone && (
+                <a className="store-hours" id="store-phone" href={`tel:${phone.replace(/[^+0-9]/g, '')}`} style={{ color: 'var(--primary)' }}>
+                  {phone}
                 </a>
               )}
             </div>
           </div>
-          <div className="coverage-notice">
-            <span className="material-symbols-outlined">moped</span>
-            <p>
-              فرع سيدي سالم الرئيسي ومناطق أخرى لخدمتكم
-              <span className="highlight"> يومياً من ٧ ص حتى ٢ ص</span> مع الحفاظ على درجة حرارة المشروب وعبق التحميص.
-            </p>
-          </div>
+          {deliveryEnabled && tenant.ordering.deliveryAreaText && (
+            <div className="coverage-notice">
+              <span className="material-symbols-outlined">moped</span>
+              <p>{tenant.ordering.deliveryAreaText}</p>
+            </div>
+          )}
         </section>
       </div>
     </main>

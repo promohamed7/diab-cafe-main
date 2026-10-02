@@ -2,17 +2,21 @@ import React from 'react';
 import { useUI } from '../context/UIContext';
 import type { NavigationTab } from '../context/UIContext';
 import { useCart } from '../hooks/useCart';
+import { useTenant } from '../tenant/TenantContext';
 
 export const BottomNav: React.FC = () => {
   const { activeTab, setActiveTab } = useUI();
   const { itemCount: cartCount } = useCart();
+  const { tenant } = useTenant();
+  const about = tenant.content.about;
 
   const navItems: { tab: NavigationTab; label: string; icon: string; id: string }[] = [
-    { tab: 'home', label: 'نوع الطلب', icon: 'room_service', id: 'nav-mode' },
+    { tab: 'home', label: 'الرئيسية', icon: 'room_service', id: 'nav-mode' },
     { tab: 'menu', label: 'المنيو', icon: 'local_cafe', id: 'nav-menu' },
     { tab: 'cart', label: 'السلة', icon: 'shopping_bag', id: 'nav-cart' },
     { tab: 'order', label: 'تتبع الطلب', icon: 'near_me', id: 'nav-track' },
-    { tab: 'heritage', label: 'تراث دياب', icon: 'auto_awesome', id: 'nav-heritage' },
+    // The café's own page appears only if the café provides content for it.
+    ...(about ? [{ tab: 'about' as NavigationTab, label: about.navLabel, icon: 'auto_awesome', id: 'nav-about' }] : [])
   ];
 
   return (

@@ -1,7 +1,7 @@
 {
-  "name": "diab-cafe",
+  "name": "inbyte-cafe-digital-menu",
   "version": "1.0.0",
-  "description": "Digital menu and customer ordering channel for Diab Cafe, integrated with the INBYTE Café POS.",
+  "description": "White-label digital menu and customer ordering channel for cafés using the INBYTE Café POS.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

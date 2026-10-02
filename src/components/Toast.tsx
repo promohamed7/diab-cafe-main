@@ -31,7 +31,7 @@ export const Toast: React.FC = () => {
         zIndex: 2200,
         background: 'rgba(26, 21, 18, 0.96)',
         color: '#F4EDE4',
-        border: `1px solid ${toast.tone === 'error' ? 'rgba(255, 180, 171, 0.55)' : 'rgba(244, 189, 97, 0.35)'}`,
+        border: `1px solid ${toast.tone === 'error' ? 'rgba(255, 180, 171, 0.55)' : 'rgba(var(--brand-rgb), 0.35)'}`,
         boxShadow: '0 12px 32px rgba(0, 0, 0, 0.65)',
         borderRadius: '9999px',
         padding: '0.65rem 1.25rem',

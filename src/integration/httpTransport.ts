@@ -70,18 +70,22 @@ export function createHttpTransport(options: HttpTransportOptions): CafeTranspor
     return body;
   }
 
+  /** Every path is under the tenant, so the relay can enforce café isolation. */
+  const tenantPath = (tenantId: string, path: string) => `/tenants/${encodeURIComponent(tenantId)}${path}`;
+
   return {
     kind: 'http',
-    getCatalog: (signal) => request('/catalog', { method: 'GET' }, signal),
-    resolveTableToken: (token, signal) =>
+    getTenantConfig: (tenantId, signal) => request(tenantPath(tenantId, '/config'), { method: 'GET' }, signal),
+    getCatalog: (tenantId, signal) => request(tenantPath(tenantId, '/catalog'), { method: 'GET' }, signal),
+    resolveTableToken: (tenantId, token, signal) =>
       request(
-        '/tables/resolve',
+        tenantPath(tenantId, '/tables/resolve'),
         { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) },
         signal
       ),
-    submitOrder: (req: SubmitOrderRequest, signal) =>
+    submitOrder: (tenantId, req: SubmitOrderRequest, signal) =>
       request(
-        '/orders',
+        tenantPath(tenantId, '/orders'),
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Idempotency-Key': req.clientRequestId },
@@ -89,8 +93,8 @@ export function createHttpTransport(options: HttpTransportOptions): CafeTranspor
         },
         signal
       ),
-    getOrderStatus: (publicReference, signal) =>
-      request(`/orders/${encodeURIComponent(publicReference)}`, { method: 'GET' }, signal)
+    getOrderStatus: (tenantId, publicReference, signal) =>
+      request(tenantPath(tenantId, `/orders/${encodeURIComponent(publicReference)}`), { method: 'GET' }, signal)
   };
 }
 
@@ -101,6 +105,7 @@ export function createUnconfiguredTransport(): CafeTransport {
   };
   return {
     kind: 'unconfigured',
+    getTenantConfig: fail,
     getCatalog: fail,
     resolveTableToken: fail,
     submitOrder: fail,

@@ -1,12 +1,16 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useMoney } from '../tenant/TenantContext';
 import { useUI } from '../context/UIContext';
 import { useCatalog } from '../hooks/useCatalog';
 import { useCart } from '../hooks/useCart';
 import type { CafeId, CatalogModifierGroup } from '../types/catalog';
 import { isOrderable } from '../domain/catalogIndex';
 import { toggleModifierOption, validateModifierSelection } from '../domain/modifiers';
-import { estimateUnitCents, formatMoney } from '../domain/pricing';
+import { estimateUnitCents } from '../domain/pricing';
 import { MAX_QUANTITY_PER_LINE } from '../domain/cart';
+import { useOrderContext } from '../hooks/useOrderContext';
+import { useTenant } from '../tenant/TenantContext';
+import { canAcceptOrders } from '../tenant/tenantPolicy';
 
 function groupHint(group: CatalogModifierGroup): string {
   if (group.isRequired && !group.allowMultiple) return 'مطلوب • اختر واحداً';
@@ -15,15 +19,20 @@ function groupHint(group: CatalogModifierGroup): string {
   return 'اختياري • اختر واحداً';
 }
 
-function optionPriceLabel(delta: number): string | null {
+function optionPriceLabel(delta: number, money: (cents: number) => string): string | null {
   if (delta === 0) return null;
-  return delta > 0 ? `+${formatMoney(delta)}` : formatMoney(delta);
+  return delta > 0 ? `+${money(delta)}` : money(delta);
 }
 
 export const ModifierModal: React.FC = () => {
+  const money = useMoney();
   const { modifierProductId, closeModifierModal, showToast } = useUI();
   const { index } = useCatalog();
   const { addItem } = useCart();
+  const { tenant } = useTenant();
+  const { orderTypeEnabled } = useOrderContext();
+  // Browse-only when the café has online ordering off (or the current journey disabled).
+  const orderingOpen = canAcceptOrders(tenant) && orderTypeEnabled;
 
   const product = modifierProductId !== null ? index?.productsById.get(modifierProductId) ?? null : null;
   const [selected, setSelected] = useState<CafeId[]>([]);
@@ -51,9 +60,13 @@ export const ModifierModal: React.FC = () => {
 
   const unitCents = estimateUnitCents(product, selected);
   const orderable = isOrderable(product);
-  const canAdd = orderable && issues.length === 0;
+  const canAdd = orderingOpen && orderable && issues.length === 0;
 
   const handleAdd = () => {
+    if (!orderingOpen) {
+      showToast('الطلب أونلاين غير متاح حالياً. يمكنك تصفح المنيو فقط.', 'info');
+      return;
+    }
     if (!canAdd) {
       setShowErrors(true);
       return;
@@ -123,7 +136,7 @@ export const ModifierModal: React.FC = () => {
                 <div className="modifier-options-grid">
                   {group.options.map((option) => {
                     const isOn = selected.includes(option.id);
-                    const price = optionPriceLabel(option.priceDeltaCents);
+                    const price = optionPriceLabel(option.priceDeltaCents, money);
                     return (
                       <button
                         key={option.id}
@@ -177,8 +190,8 @@ export const ModifierModal: React.FC = () => {
             data-ready={canAdd}
             onClick={handleAdd}
           >
-            <span>{orderable ? 'إضافة إلى السلة' : 'غير متاح'}</span>
-            <span id="modal-total-price">{formatMoney(unitCents * quantity)}</span>
+            <span>{!orderingOpen ? 'تصفح فقط' : orderable ? 'إضافة إلى السلة' : 'غير متاح'}</span>
+            <span id="modal-total-price">{money(unitCents * quantity)}</span>
           </button>
         </div>
       </div>

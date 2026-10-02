@@ -1,6 +1,6 @@
-// DEVELOPMENT ONLY. Builds a Café-shaped catalog projection (wire format) from
-// the prototype's menu content so the website can be developed before the Café
-// adapter exists. IDs here are mock integers, not real Café IDs.
+// DEVELOPMENT ONLY. Catalog for the "INBYTE Demo Café" sample tenant, built in
+// the Café wire format from ./fixtureMenu.ts. IDs are mock integers, not real
+// Café IDs. Shared wire types used by every mock tenant live here too.
 //
 // Bean weights are modelled as additive per-product options because Café prices
 // lines as base + Σ option deltas. How Café will really model weight-based
@@ -88,7 +88,7 @@ const ROAST: WireGroup = {
 };
 const SPICING: WireGroup = {
   id: 18, name: 'التحويجة', isRequired: false, allowMultiple: false,
-  options: [{ id: 1801, name: 'تحويجة دياب (هيل ومستكة)', priceDeltaCents: 1000 }]
+  options: [{ id: 1801, name: 'تحويجة البيت (هيل ومستكة)', priceDeltaCents: 1000 }]
 };
 const AROMATICS: WireGroup = {
   id: 19, name: 'إضافات شرقية', isRequired: false, allowMultiple: true,
@@ -148,7 +148,7 @@ export interface MockCatalogOverrides {
   availability: Record<number, 'AVAILABLE' | 'UNAVAILABLE'>;
 }
 
-export function buildMockCatalog(overrides: MockCatalogOverrides): WireCatalog {
+export function buildDemoCatalog(overrides: MockCatalogOverrides): WireCatalog {
   const categoryIds = new Map<string, number>();
   const categories: WireCategory[] = RAW_CATEGORIES.map((c, i) => {
     categoryIds.set(c.id, i + 1);
@@ -173,15 +173,15 @@ export function buildMockCatalog(overrides: MockCatalogOverrides): WireCatalog {
   });
 
   return {
-    store: { name: 'دياب كافيه — فرع سيدي سالم', phone: null, address: 'سيدي سالم، كفر الشيخ' },
+    store: { name: 'INBYTE Demo Café', phone: null, address: 'عنوان تجريبي — شارع النموذج' },
     categories,
     products,
     version: `mock-${overrides.priceDriftCents}`
   };
 }
 
-/** Dev QR tokens. Real tokens are issued by Café; these only exist in the mock. */
-export const MOCK_TABLES: Record<string, string> = {
+/** Dev QR tokens for the demo tenant. Real tokens are issued by Café. */
+export const DEMO_TABLES: Record<string, string> = {
   'qr_7c1e4b9a2f6d4e08': 'طاولة 1 — الصالة الرئيسية',
   'qr_a93f02d6c8b14e7f': 'طاولة 2 — ركن العائلات',
   'qr_5e8b71c0d4a2493b': 'طاولة 3 — بجوار النافذة',

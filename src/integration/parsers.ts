@@ -32,6 +32,14 @@ const PAYMENT_STATUSES: readonly CafePaymentStatus[] = [
 ];
 const ORDER_TYPES: readonly OrderType[] = ['PICKUP', 'DELIVERY', 'DINE_IN'];
 
+/**
+ * If the integration echoes a tenantId, it must be the tenant we asked about.
+ * Defence in depth: a relay bug must not show one café's data inside another.
+ */
+export function assertTenantEcho(raw: unknown, tenantId: string): void {
+  if (isObj(raw) && raw.tenantId !== undefined && raw.tenantId !== tenantId) invalid();
+}
+
 function invalid(): never {
   throw new CafeIntegrationError('INVALID_RESPONSE');
 }

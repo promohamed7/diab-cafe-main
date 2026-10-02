@@ -13,7 +13,7 @@ import { MenuPage } from './pages/MenuPage';
 import { CartPage } from './pages/CartPage';
 import { CheckoutPage } from './pages/CheckoutPage';
 import { OrderTrackingPage } from './pages/OrderTrackingPage';
-import { HeritagePage } from './pages/HeritagePage';
+import { AboutPage } from './pages/AboutPage';
 
 export const App: React.FC = () => {
   const { activeTab } = useUI();
@@ -38,7 +38,7 @@ export const App: React.FC = () => {
         {activeTab === 'cart' && <CartPage />}
         {activeTab === 'checkout' && <CheckoutPage />}
         {activeTab === 'order' && <OrderTrackingPage />}
-        {activeTab === 'heritage' && <HeritagePage />}
+        {activeTab === 'about' && <AboutPage />}
       </div>
 
       {/* Persistent Bottom Navigation */}

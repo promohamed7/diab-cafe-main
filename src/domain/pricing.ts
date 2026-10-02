@@ -19,12 +19,13 @@ export function estimateLineCents(product: CatalogProduct, optionIds: readonly C
   return estimateUnitCents(product, optionIds) * quantity;
 }
 
-export function formatMoney(cents: number | null | undefined): string {
+/** Formats minor units with the tenant's currency symbol (e.g. "ج.م"). Display only. */
+export function formatMoney(cents: number | null | undefined, currencySymbol: string): string {
   if (typeof cents !== 'number' || !Number.isFinite(cents)) return '—';
   const sign = cents < 0 ? '-' : '';
   const abs = Math.abs(Math.round(cents));
-  const pounds = Math.floor(abs / 100);
-  const piastres = abs % 100;
-  const body = piastres === 0 ? String(pounds) : `${pounds}.${String(piastres).padStart(2, '0')}`;
-  return `${sign}${body} ج.م`;
+  const major = Math.floor(abs / 100);
+  const minor = abs % 100;
+  const body = minor === 0 ? String(major) : `${major}.${String(minor).padStart(2, '0')}`;
+  return `${sign}${body} ${currencySymbol}`;
 }

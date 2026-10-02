@@ -1,0 +1,107 @@
+{
+  "tenantId": "cafe-x",
+  "slug": "cafe-x",
+  "locale": "ar-EG",
+  "identity": {
+    "businessName": "Café X LLC",
+    "displayName": "Café X",
+    "tagline": "قهوة الحي",
+    "description": "مقهى Café X — اطلب للاستلام أو التوصيل أو من طاولتك.",
+    "logoUrl": "https://cdn.example.com/cafe-x/logo.png",
+    "faviconUrl": "https://cdn.example.com/cafe-x/favicon.png"
+  },
+  "branding": {
+    "colors": {
+      "primary": "#d64545",
+      "primaryDeep": "#9e2b2b",
+      "secondary": "#f0bd8b",
+      "accent": "#b4cdb0"
+    },
+    "lightColors": {
+      "primary": "#a83232",
+      "primaryDeep": "#7a2020"
+    },
+    "surfaces": {
+      "dark": {
+        "background": "#141010",
+        "surface": "#1f1919",
+        "text": "#f2e9e9"
+      },
+      "light": {
+        "background": "#fdf8f8",
+        "surface": "#ffffff",
+        "text": "#2a1515"
+      }
+    },
+    "defaultTheme": "dark",
+    "fontFamily": "Cairo",
+    "fontStylesheetUrl": "https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800&display=swap"
+  },
+  "contact": {
+    "phone": "+20 111 222 3333",
+    "whatsapp": "+20 111 222 3333",
+    "address": "شارع المثال 5، المدينة",
+    "mapsUrl": "https://maps.example.com/cafe-x",
+    "website": "https://cafe-x.example.com",
+    "social": [
+      {
+        "label": "Instagram",
+        "url": "https://instagram.example.com/cafe-x"
+      }
+    ]
+  },
+  "businessHoursText": "يومياً من ٩ صباحاً حتى ١١ مساءً",
+  "features": {
+    "onlineOrdering": true,
+    "pickup": true,
+    "delivery": true,
+    "dineInQr": true
+  },
+  "ordering": {
+    "minimumOrderCents": null,
+    "deliveryAreaText": "التوصيل داخل وسط المدينة."
+  },
+  "paymentMethods": [
+    "CASH",
+    "CREDIT_CARD"
+  ],
+  "currency": {
+    "code": "EGP",
+    "symbol": "ج.م"
+  },
+  "content": {
+    "heroBadge": "CAFÉ X • SPECIALTY COFFEE",
+    "heroTitle": "أين تود الاستمتاع بقهوتك اليوم؟",
+    "heroSubtitle": "اختر طريقة الطلب وابدأ",
+    "heroImageUrl": null,
+    "heroImageMobileUrl": null,
+    "about": {
+      "navLabel": "قصتنا",
+      "title": "عن Café X",
+      "lead": "Since 2026",
+      "intro": "نص تعريفي قصير عن المقهى.",
+      "sections": [
+        {
+          "icon": "history_edu",
+          "title": "حكايتنا",
+          "paragraphs": [
+            "فقرة أولى.",
+            "فقرة ثانية."
+          ],
+          "items": []
+        },
+        {
+          "icon": "public",
+          "title": "محاصيلنا",
+          "paragraphs": [],
+          "items": [
+            {
+              "title": "إثيوبيا",
+              "text": "نكهات زهرية."
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

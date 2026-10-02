@@ -11,10 +11,10 @@ import {
   setCartLineQuantity
 } from '../domain/cart';
 import { generateRequestId } from '../domain/checkoutAttempt';
-import { readJson, writeJson } from '../services/storage';
+import { useTenant } from '../tenant/TenantContext';
 import { useCatalog } from './useCatalog';
 
-const CART_KEY = 'inbyte_cart_v2';
+const CART_NAME = 'cart';
 
 interface CartContextValue {
   lines: CartLine[];
@@ -33,13 +33,15 @@ const CartContext = createContext<CartContextValue | null>(null);
 
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { index } = useCatalog();
-  const [lines, setLinesState] = useState<CartLine[]>(() => sanitizeStoredCart(readJson(CART_KEY)));
+  // Each café has its own cart; another café's cart is never read or migrated.
+  const { scope } = useTenant();
+  const [lines, setLinesState] = useState<CartLine[]>(() => sanitizeStoredCart(scope.storage.readJson(CART_NAME)));
   // Mutations read the latest lines synchronously so callers get an immediate result.
   const linesRef = useRef(lines);
 
   useEffect(() => {
-    writeJson(CART_KEY, lines);
-  }, [lines]);
+    scope.storage.writeJson(CART_NAME, lines);
+  }, [lines, scope]);
 
   const commit = useCallback((next: CartLine[]) => {
     linesRef.current = next;

@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useRef } from 'react';
+import { useMoney } from '../tenant/TenantContext';
 import { useUI } from '../context/UIContext';
 import { useCatalog } from '../hooks/useCatalog';
 import { useCart } from '../hooks/useCart';
 import { isOrderable } from '../domain/catalogIndex';
-import { formatMoney } from '../domain/pricing';
 import { CUSTOMER_ERROR_MESSAGES } from '../integration/errors';
 import type { CatalogProduct } from '../types/catalog';
 import { categoryIcon } from '../components/categoryIcon';
@@ -13,6 +13,7 @@ function hasPricedOptions(p: CatalogProduct): boolean {
 }
 
 export const MenuPage: React.FC = () => {
+  const money = useMoney();
   const {
     setActiveTab,
     openModifierModal,
@@ -121,7 +122,7 @@ export const MenuPage: React.FC = () => {
                 paddingLeft: searchQuery ? '2.5rem' : '1rem',
                 height: '2.85rem',
                 fontSize: '13px',
-                border: '1px solid rgba(244, 189, 97, 0.4)',
+                border: '1px solid rgba(var(--brand-rgb), 0.4)',
                 background: 'var(--surface-container-high)'
               }}
             />
@@ -172,7 +173,7 @@ export const MenuPage: React.FC = () => {
                     fontSize: '12px',
                     fontWeight: 600,
                     background: isSelected ? 'var(--primary)' : 'var(--surface-container-high)',
-                    color: isSelected ? '#120F0D' : 'var(--on-surface)',
+                    color: isSelected ? 'var(--on-brand)' : 'var(--on-surface)',
                     border: isSelected ? '1px solid var(--primary)' : '1px solid rgba(255,255,255,0.06)',
                     display: 'flex',
                     alignItems: 'center',
@@ -265,7 +266,7 @@ export const MenuPage: React.FC = () => {
                       <span style={{ fontSize: '11px', color: 'var(--on-surface-variant)', display: 'block' }}>
                         {hasPricedOptions(p) ? 'يبدأ من' : 'السعر'}
                       </span>
-                      <span style={{ fontSize: '16px', fontWeight: 900, color: 'var(--primary)' }}>{formatMoney(p.priceCents)}</span>
+                      <span style={{ fontSize: '16px', fontWeight: 900, color: 'var(--primary)' }}>{money(p.priceCents)}</span>
                     </div>
 
                     <button
@@ -273,9 +274,9 @@ export const MenuPage: React.FC = () => {
                       className="product-add-btn"
                       disabled={!orderable}
                       style={{
-                        background: 'rgba(200, 150, 62, 0.18)',
+                        background: 'rgba(var(--brand-deep-rgb), 0.18)',
                         color: 'var(--primary)',
-                        border: '1px solid rgba(200, 150, 62, 0.35)',
+                        border: '1px solid rgba(var(--brand-deep-rgb), 0.35)',
                         borderRadius: '9999px',
                         padding: '0.45rem 0.85rem',
                         fontSize: '12px',
@@ -320,20 +321,20 @@ export const MenuPage: React.FC = () => {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              boxShadow: '0 12px 32px rgba(0, 0, 0, 0.6), 0 0 20px rgba(244, 189, 97, 0.25)',
+              boxShadow: '0 12px 32px rgba(0, 0, 0, 0.6), 0 0 20px rgba(var(--brand-rgb), 0.25)',
               cursor: 'pointer'
             }}
             onClick={() => setActiveTab('cart')}
             onKeyDown={(e) => e.key === 'Enter' && setActiveTab('cart')}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-              <div style={{ background: 'var(--primary)', color: '#120F0D', width: '28px', height: '28px', borderRadius: '9999px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '13px' }}>
+              <div style={{ background: 'var(--primary)', color: 'var(--on-brand)', width: '28px', height: '28px', borderRadius: '9999px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '13px' }}>
                 {itemCount}
               </div>
               <span style={{ fontSize: '13.5px', fontWeight: 700, color: '#F4EDE4' }}>سلة الطلب الحالية</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-              <span style={{ fontSize: '15px', fontWeight: 900, color: 'var(--primary)' }}>{formatMoney(estimatedTotalCents)}</span>
+              <span style={{ fontSize: '15px', fontWeight: 900, color: 'var(--primary)' }}>{money(estimatedTotalCents)}</span>
               <span className="material-symbols-outlined" style={{ fontSize: '20px', color: 'var(--primary)' }}>arrow_back</span>
             </div>
           </div>

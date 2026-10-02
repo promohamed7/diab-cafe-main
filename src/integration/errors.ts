@@ -12,6 +12,7 @@ export type CafeErrorCode =
   | 'PRICE_TAMPERED_MISMATCH'
   | 'IDEMPOTENCY_KEY_CONFLICT'
   | 'INVALID_TABLE_TOKEN'
+  | 'TENANT_NOT_FOUND'
   | 'ORDER_NOT_FOUND'
   | 'VALIDATION_FAILED'
   | 'INVALID_RESPONSE'
@@ -33,6 +34,7 @@ const WIRE_CODE_MAP: Record<string, CafeErrorCode> = {
   IDEMPOTENCYKEYCONFLICT: 'IDEMPOTENCY_KEY_CONFLICT',
   INVALIDTABLETOKEN: 'INVALID_TABLE_TOKEN',
   TABLEINACTIVEORINVALID: 'INVALID_TABLE_TOKEN',
+  TENANTNOTFOUND: 'TENANT_NOT_FOUND',
   ORDERNOTFOUND: 'ORDER_NOT_FOUND',
   VALIDATIONFAILED: 'VALIDATION_FAILED',
   VALIDATIONERROR: 'VALIDATION_FAILED',
@@ -100,6 +102,7 @@ export const CUSTOMER_ERROR_MESSAGES: Record<CafeErrorCode, string> = {
   PRICE_TAMPERED_MISMATCH: 'تم تحديث أسعار بعض الأصناف. راجع الإجمالي الجديد ثم أكد الطلب مرة أخرى.',
   IDEMPOTENCY_KEY_CONFLICT: 'حدث تعارض في محاولة الإرسال. راجع طلبك وأرسله مرة أخرى.',
   INVALID_TABLE_TOKEN: 'رمز الطاولة غير صالح أو منتهي. يرجى مسح كود QR الموجود على طاولتك مرة أخرى.',
+  TENANT_NOT_FOUND: 'هذا المقهى غير متاح على المنصة حالياً.',
   ORDER_NOT_FOUND: 'لم نتمكن من العثور على هذا الطلب.',
   VALIDATION_FAILED: 'بعض بيانات الطلب غير صحيحة. يرجى مراجعتها والمحاولة مرة أخرى.',
   INVALID_RESPONSE: 'لم نتمكن من التأكد من استلام الكافيه لطلبك. يمكنك إعادة المحاولة بأمان.',
