@@ -7,6 +7,7 @@ import { QuickCategoriesModal } from './components/QuickCategoriesModal';
 import { Toast } from './components/Toast';
 import { DevMockBanner } from './components/DevMockBanner';
 import { TableSessionBanner } from './components/TableSessionBanner';
+import { AnnouncementBanner } from './components/AnnouncementBanner';
 
 import { HomeModePage } from './pages/HomeModePage';
 import { MenuPage } from './pages/MenuPage';
@@ -30,6 +31,7 @@ export const App: React.FC = () => {
         {/* Clears the fixed header itself when it has content (see ordering.css). */}
         <div className="ordering-banners">
           <DevMockBanner />
+          <AnnouncementBanner />
           <TableSessionBanner />
         </div>
 

@@ -4,6 +4,13 @@
 build serve any café. Onboarding a café means adding its *data* (a tenant
 configuration and its INBYTE Café catalog), never editing React components.
 
+> **Superseded in part:** cafés are now created and configured in the **INBYTE
+> Admin** and stored in PostgreSQL by the platform backend. Static
+> `/tenants/{id}.json` files are a bootstrap/demo source only (import them with
+> `npm run tenant:import`). See [MULTI_TENANCY.md](MULTI_TENANCY.md) and
+> [ONBOARDING_A_CAFE.md](ONBOARDING_A_CAFE.md). The frontend mechanics below
+> (theming, isolation in the browser) are unchanged.
+
 Related: [WEBSITE_INTEGRATION.md](WEBSITE_INTEGRATION.md) (Café contract) ·
 [tenant-config.example.json](tenant-config.example.json) (complete example).
 

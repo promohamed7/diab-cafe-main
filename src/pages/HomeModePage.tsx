@@ -401,6 +401,20 @@ export const HomeModePage: React.FC = () => {
           )}
         </div>
 
+        {tenant.content.promotions.length > 0 && (
+          <section className="tenant-promotions animate-entrance" id="tenant-promotions" aria-label="عروض وأخبار المقهى">
+            {tenant.content.promotions.map((promo, i) => (
+              <article key={i} className="tenant-promo-card">
+                {promo.imageUrl && <img src={promo.imageUrl} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" />}
+                <div>
+                  <h2>{promo.title}</h2>
+                  {promo.text && <p>{promo.text}</p>}
+                </div>
+              </article>
+            ))}
+          </section>
+        )}
+
         {/* STORE INFO FOOTER STRIP */}
         <section className="store-info animate-entrance" id="store-info" aria-label="معلومات المقهى">
           <div className="store-header">
@@ -427,6 +441,10 @@ export const HomeModePage: React.FC = () => {
             </div>
           )}
         </section>
+
+        {tenant.content.footerText && (
+          <p className="tenant-footer-text" id="tenant-footer">{tenant.content.footerText}</p>
+        )}
       </div>
     </main>
   );

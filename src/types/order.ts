@@ -69,17 +69,29 @@ export interface SubmitOrderRequest {
   clientRequestId: string;
 }
 
-/** Public-safe acknowledgement returned by Café after it stores the order. */
+/**
+ * Where the order is on its way to the café's POS:
+ *   AWAITING_CAFE    — accepted by the platform, not yet received by the café's INBYTE Café
+ *   RECEIVED_BY_CAFE — INBYTE Café received it (created it, or rejected it)
+ *   NOT_DELIVERED    — the café never picked it up in time; it was not placed
+ */
+export type OrderDeliveryState = 'AWAITING_CAFE' | 'RECEIVED_BY_CAFE' | 'NOT_DELIVERED';
+
+/** Public-safe acknowledgement returned when the order is accepted for the café. */
 export interface OrderAcknowledgement {
   /** Non-guessable reference used for tracking. Never the sequential order number. */
   publicReference: string;
-  /** Café order number, e.g. ORD-1042. For display only, never a credential. */
-  orderNumber: string;
+  /** Café order number, e.g. ORD-1042, once INBYTE Café created the order. Display only. */
+  orderNumber: string | null;
   orderStatus: CafeOrderStatus;
   paymentStatus: CafePaymentStatus;
-  subtotalCents: number;
-  discountCents: number;
-  totalCents: number;
+  deliveryState: OrderDeliveryState;
+  /** Platform estimate from the café's last catalog sync. */
+  estimatedTotalCents: number | null;
+  /** Café's authoritative amounts — null until INBYTE Café priced the order. */
+  subtotalCents: number | null;
+  discountCents: number | null;
+  totalCents: number | null;
   createdAt: string | null;
   /** True when Café returned the original result for a repeated clientRequestId. */
   replayed: boolean;
@@ -88,10 +100,12 @@ export interface OrderAcknowledgement {
 /** Public-safe status snapshot read through the tracking reference. */
 export interface OrderStatusSnapshot {
   publicReference: string;
-  orderNumber: string;
+  orderNumber: string | null;
   orderType: OrderType | null;
   orderStatus: CafeOrderStatus;
   paymentStatus: CafePaymentStatus;
+  deliveryState: OrderDeliveryState;
+  estimatedTotalCents: number | null;
   totalCents: number | null;
   rejectionReason: string | null;
   updatedAt: string | null;

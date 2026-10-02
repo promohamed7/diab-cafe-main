@@ -2,9 +2,9 @@
 // methods, content). It is data, so onboarding a café never touches React code.
 //
 // Sources:
+//   api    — `GET {platform}/tenants/<tenantId>/config`, managed in the INBYTE Admin (production)
 //   mock   — development fixtures (src/integration/mock/mockTenants.ts)
-//   static — `/tenants/<tenantId>.json` shipped with the deployment (default)
-//   api    — `GET {relay}/tenants/<tenantId>/config` (future Café/relay source)
+//   static — `/tenants/<tenantId>.json` shipped with a static deployment (bootstrap/demo only)
 
 import type { TenantConfig } from '../types/tenant';
 import { appConfig } from '../config/env';
@@ -40,4 +40,26 @@ export async function loadTenantConfig(tenantId: string, signal?: AbortSignal): 
       ? await transport.getTenantConfig(tenantId, signal)
       : await fetchStaticConfig(tenantId, signal);
   return parseTenantConfig(raw, tenantId);
+}
+
+/**
+ * Asks the platform which café owns the current hostname (custom domains and
+ * subdomains registered in the INBYTE Admin). null = no café for this host.
+ */
+export async function lookupTenantForHost(signal?: AbortSignal): Promise<string | null> {
+  if (!appConfig.apiBaseUrl) return null;
+  let response: Response;
+  try {
+    response = await fetch(`${appConfig.apiBaseUrl.replace(/\/+$/, '')}/domains/resolve`, { signal, credentials: 'omit', cache: 'no-store' });
+  } catch {
+    throw new CafeIntegrationError('NETWORK_ERROR');
+  }
+  if (response.status === 404) return null;
+  if (!response.ok) throw new CafeIntegrationError('SERVICE_UNAVAILABLE', response.status);
+  try {
+    const body = (await response.json()) as { tenantId?: unknown };
+    return typeof body.tenantId === 'string' ? body.tenantId : null;
+  } catch {
+    return null;
+  }
 }

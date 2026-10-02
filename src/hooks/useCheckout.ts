@@ -154,7 +154,7 @@ export function useCheckout() {
           orderType: sending.request.orderType,
           tableLabel: sending.request.orderType === 'DINE_IN' ? orderCtx.table?.tableLabel ?? null : null,
           paymentMethod: sending.request.paymentMethod,
-          acknowledgedTotalCents: ack.totalCents,
+          acknowledgedTotalCents: ack.totalCents ?? ack.estimatedTotalCents,
           placedAt: ack.createdAt ?? new Date().toISOString(),
           items: describeItems(draft)
         };

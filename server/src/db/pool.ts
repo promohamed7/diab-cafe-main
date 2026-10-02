@@ -8,9 +8,13 @@ function safeBigint(value: string): number {
   return n;
 }
 pg.types.setTypeParser(20, safeBigint);
-// BIGINT[] (e.g. modifier option IDs).
-const parseTextArray = pg.types.getTypeParser(1016) as (value: string) => (string | null)[];
-pg.types.setTypeParser(1016, (value: string) => parseTextArray(value).map((v) => (v === null ? null : safeBigint(v))));
+// BIGINT[] (e.g. modifier option IDs). OID 1016 isn't in pg's TypeId union, hence the narrow cast.
+const arrayTypes = pg.types as unknown as {
+  getTypeParser(oid: number): (value: string) => (string | null)[];
+  setTypeParser(oid: number, parse: (value: string) => unknown): void;
+};
+const parseTextArray = arrayTypes.getTypeParser(1016);
+arrayTypes.setTypeParser(1016, (value: string) => parseTextArray(value).map((v) => (v === null ? null : safeBigint(v))));
 
 export type Db = pg.Pool;
 export type DbClient = pg.PoolClient;

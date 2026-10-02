@@ -9,13 +9,13 @@ interface ImportMetaEnv {
   /** Query parameter carrying the Café table token in QR URLs (default: "table"). */
   readonly VITE_TABLE_QR_PARAM?: string;
   readonly VITE_TENANT_ID?: string;
-  /** 'fixed' | 'subdomain' | 'path' */
+  /** 'platform' | 'fixed' | 'subdomain' | 'path' */
   readonly VITE_TENANT_STRATEGY?: string;
   readonly VITE_TENANT_BASE_DOMAIN?: string;
   readonly VITE_TENANT_PATH_PREFIX?: string;
   /** JSON object: custom domain → tenantId. */
   readonly VITE_TENANT_HOST_MAP?: string;
-  /** 'static' | 'api' */
+  /** 'api' (default) | 'static' */
   readonly VITE_TENANT_CONFIG_SOURCE?: string;
 }
 

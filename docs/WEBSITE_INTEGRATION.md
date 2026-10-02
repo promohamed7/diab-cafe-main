@@ -5,6 +5,13 @@ the INBYTE Café side. It does **not** claim that any Café capability exists:
 every Café-side item marked *dependency* is not implemented in INBYTE Café today
 (see the INBYTE Café Website Integration Specification).
 
+> **Platform (current architecture):** the website now talks to the **INBYTE
+> platform backend** (`server/`, same origin, base `/api/public/v1`). The backend
+> is the relay: it owns tenants, the catalog projection, order intake and
+> tracking, and reaches each café's INBYTE Café through the connector protocol in
+> [INTEGRATION_WITH_INBYTE_CAFE.md](INTEGRATION_WITH_INBYTE_CAFE.md). Start with
+> [ARCHITECTURE.md](ARCHITECTURE.md). This document remains the website-side contract.
+
 > **Multi-café:** the website serves many cafés (tenants). Every endpoint below
 > is scoped under `{base}/tenants/{tenantId}`, and every café's data must stay
 > isolated. See [WHITE_LABEL_ARCHITECTURE.md](WHITE_LABEL_ARCHITECTURE.md).
@@ -111,18 +118,26 @@ control characters stripped.
 
 ```jsonc
 {
-  "publicReference": "non-guessable string",
-  "orderNumber": "ORD-1042",
+  "tenantId": "cafe-x",
+  "publicReference": "INB-7K4M-92QX-…",     // 80 random bits, the tracking credential
+  "orderNumber": null,                      // Café's ORD-…, once INBYTE Café created the order
   "orderStatus": "PENDING",
   "paymentStatus": "PENDING",
-  "subtotalCents": 5500, "discountCents": 0, "totalCents": 5500,
-  "createdAt": "string|null",
+  "deliveryState": "AWAITING_CAFE",         // AWAITING_CAFE | RECEIVED_BY_CAFE | NOT_DELIVERED
+  "estimatedTotalCents": 5500,              // platform estimate from the last catalog sync
+  "subtotalCents": null, "discountCents": null, "totalCents": null,  // Café's authoritative values, later
+  "createdAt": "…",
   "replayed": false
 }
 ```
 
-The confirmation screen shows Café's `orderNumber`, `totalCents` and status. No
-cashier, shift or other customer data may appear in this response.
+The platform accepts the order *for the café*; INBYTE Café creates it
+asynchronously (see [ORDER_FLOW.md](ORDER_FLOW.md)). The confirmation screen
+therefore says "received — waiting for the café" until Café has it, shows the
+estimate labelled as such, and shows Café's order number and total once known.
+An integration that answers synchronously (order number present, no
+`deliveryState`) is treated as `RECEIVED_BY_CAFE`. No cashier, shift or other
+customer data may appear in this response.
 
 ## 6. clientRequestId lifecycle
 
@@ -172,11 +187,15 @@ InstaPay / wallet / bank transfer and online gateways are future extensions.
 `GET {base}/tenants/{tenantId}/orders/{publicReference}` →
 
 ```jsonc
-{ "publicReference": "...", "orderNumber": "ORD-1042", "orderType": "PICKUP",
+{ "publicReference": "...", "orderNumber": "ORD-1042|null", "orderType": "PICKUP",
   "orderStatus": "PENDING|ACCEPTED|PREPARING|READY|COMPLETED|REJECTED|CANCELLED",
   "paymentStatus": "PENDING|SUBMITTED|VERIFICATION_REQUIRED|VERIFIED|PAID|FAILED|REFUNDED|PARTIALLY_REFUNDED",
-  "totalCents": 5500, "rejectionReason": "string|null", "updatedAt": "string|null" }
+  "deliveryState": "AWAITING_CAFE|RECEIVED_BY_CAFE|NOT_DELIVERED",
+  "estimatedTotalCents": 5500, "totalCents": "5500|null", "rejectionReason": "string|null", "updatedAt": "string|null" }
 ```
+
+`NOT_DELIVERED` means the café never picked the order up before its deadline:
+it was not placed and nothing is owed (shown as such, with orderStatus `CANCELLED`).
 
 - Read-only; polled every 10 s while in progress and visible, backing off on errors,
   stopping at COMPLETED/REJECTED/CANCELLED.
@@ -212,20 +231,27 @@ All variables are public build-time values (`.env.example`):
 | Variable | Purpose |
 |---|---|
 | `VITE_CAFE_TRANSPORT` | `http` (default in production builds) or `mock` (default in `npm run dev`) |
-| `VITE_CAFE_API_BASE_URL` | Base URL of the Café integration adapter/relay. Unset → ordering unavailable |
+| `VITE_CAFE_API_BASE_URL` | Base URL of the platform public API. Default `/api/public/v1` (same origin); `none` disables ordering |
 | `VITE_CAFE_API_TIMEOUT_MS` | Request timeout (default 15000) |
 | `VITE_TABLE_QR_PARAM` | Query parameter carrying the table token (default `table`) |
 | `VITE_TENANT_ID` | Café for the `fixed` strategy (and fallback for others) |
-| `VITE_TENANT_STRATEGY` | `fixed` (default), `subdomain` or `path` |
+| `VITE_TENANT_STRATEGY` | `platform` (production default: `/t/{id}/` paths, then the backend maps the hostname), `fixed`, `subdomain` or `path` |
 | `VITE_TENANT_BASE_DOMAIN` | Parent domain for the `subdomain` strategy |
 | `VITE_TENANT_PATH_PREFIX` | Path segment before the tenant id for `path` (default `t`) |
 | `VITE_TENANT_HOST_MAP` | JSON map of custom domains → tenant ids |
-| `VITE_TENANT_CONFIG_SOURCE` | `static` (default: `/tenants/{tenantId}.json`) or `api` (`{base}/tenants/{tenantId}/config`) |
+| `VITE_TENANT_CONFIG_SOURCE` | `api` (default: `{base}/tenants/{tenantId}/config`, managed in the INBYTE Admin) or `static` (`/tenants/{tenantId}.json`, bootstrap/demo only) |
 
 Never put secrets in `VITE_*` variables. Any machine credential for Café belongs
 to the relay/adapter, not the browser.
 
 ## 12. Café dependencies (not implemented in Café today)
+
+> **Status update (platform):** items 1, 3 (projection), 5, 6, 7, 8, 9 and 10 are
+> now implemented **by the INBYTE platform backend** for the website. What remains
+> on the Café side is the connector inside INBYTE Café and defence-in-depth
+> validation in `create_order` — see
+> [INTEGRATION_WITH_INBYTE_CAFE.md §9](INTEGRATION_WITH_INBYTE_CAFE.md). The
+> original list is kept below for traceability.
 
 1. A transport: relay or adapter reachable by the website (topology undecided).
 2. Machine authentication between relay/adapter and Café.

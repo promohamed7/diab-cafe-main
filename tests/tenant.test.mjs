@@ -1,7 +1,7 @@
 // Tenant resolution, configuration, policy, storage isolation and theming.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveTenant, parseHostMap } from '../src/tenant/tenantResolver.ts';
+import { resolveTenant, resolveTenantAsync, parseHostMap } from '../src/tenant/tenantResolver.ts';
 import { parseTenantConfig, TenantConfigError } from '../src/tenant/parseTenantConfig.ts';
 import {
   canAcceptOrders,
@@ -219,4 +219,20 @@ test('theme: tenant colours become CSS variables for each mode, with readable te
   const noLight = themeVariables({ colors: { primary: '#ff0000' }, defaultTheme: 'dark' }, 'light');
   assert.equal(noLight['--primary'], '#ff0000', 'falls back to the main colours');
   assert.ok(noLight['--brand-deep-rgb'], 'deep shade derived when absent');
+});
+
+test('platform strategy: /t/<id>/ paths first, then the backend maps the host; no default café', async () => {
+  const opts = { strategy: 'platform', fixedTenantId: null, baseDomain: null, pathPrefix: 't', hostMap: {}, allowQueryOverride: false };
+  let lookups = 0;
+  const lookup = (answer) => async () => {
+    lookups += 1;
+    return answer;
+  };
+  const at = (url) => { const u = new URL(url); return { hostname: u.hostname, pathname: u.pathname, search: u.search }; };
+  assert.deepEqual(await resolveTenantAsync(at('https://menu.inbyte.app/t/cafe-x/?table=abc'), opts, lookup('other')), { tenantId: 'cafe-x', source: 'path' });
+  assert.equal(lookups, 0, 'a path needs no host lookup');
+  assert.deepEqual(await resolveTenantAsync(at('https://cafe-x.com/'), opts, lookup('cafe-x')), { tenantId: 'cafe-x', source: 'platform-host' });
+  assert.equal(await resolveTenantAsync(at('https://unknown.example/'), opts, lookup(null)), null);
+  assert.equal(await resolveTenantAsync(at('https://evil.example/'), opts, lookup('../../etc')), null, 'backend answers are validated too');
+  assert.equal(await resolveTenantAsync(at('https://x.example/?tenant=cafe-y'), opts, lookup(null)), null, '?tenant= is ignored outside dev');
 });

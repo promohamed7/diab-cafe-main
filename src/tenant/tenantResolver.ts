@@ -5,14 +5,17 @@
 //   subdomain  — cafe-a.menu.example.com  (VITE_TENANT_BASE_DOMAIN=menu.example.com)
 //   path       — menu.example.com/t/cafe-a/   (VITE_TENANT_PATH_PREFIX=t)
 //   host map   — custom domains, e.g. {"cafe-a.com":"cafe-a"} (VITE_TENANT_HOST_MAP)
+//   platform   — the INBYTE platform decides: /t/<tenantId>/ paths, otherwise the
+//                backend maps the request's hostname (custom domains and
+//                subdomains registered in the INBYTE Admin) to a café
 // A `?tenant=` override exists only for development/mock builds.
 //
 // URL segments are treated as tenant IDs; every value is validated.
 
 import { TENANT_ID_PATTERN } from './parseTenantConfig.ts';
 
-export type TenantStrategy = 'fixed' | 'subdomain' | 'path';
-export type TenantSource = 'query' | 'host-map' | 'subdomain' | 'path' | 'fixed';
+export type TenantStrategy = 'fixed' | 'subdomain' | 'path' | 'platform';
+export type TenantSource = 'query' | 'host-map' | 'subdomain' | 'path' | 'platform-host' | 'fixed';
 
 export interface TenantResolverOptions {
   strategy: TenantStrategy;
@@ -65,7 +68,7 @@ export function resolveTenant(location: LocationLike, options: TenantResolverOpt
     }
   }
 
-  if (options.strategy === 'path') {
+  if (options.strategy === 'path' || options.strategy === 'platform') {
     const segments = location.pathname.split('/').filter(Boolean);
     const prefix = options.pathPrefix.replace(/^\/+|\/+$/g, '');
     const idx = prefix ? (segments[0] === prefix ? 1 : -1) : 0;
@@ -73,6 +76,25 @@ export function resolveTenant(location: LocationLike, options: TenantResolverOpt
     if (id) return { tenantId: id, source: 'path' };
   }
 
+  const fixed = valid(options.fixedTenantId);
+  return fixed ? { tenantId: fixed, source: 'fixed' } : null;
+}
+
+/**
+ * Platform strategy: dev override, build-time host map and /t/<id>/ paths are
+ * checked locally; otherwise the backend is asked which café owns this host.
+ * Other strategies resolve synchronously.
+ */
+export async function resolveTenantAsync(
+  location: LocationLike,
+  options: TenantResolverOptions,
+  lookupHost: () => Promise<string | null>
+): Promise<ResolvedTenant | null> {
+  if (options.strategy !== 'platform') return resolveTenant(location, options);
+  const local = resolveTenant(location, { ...options, fixedTenantId: null });
+  if (local) return local;
+  const fromHost = valid(await lookupHost());
+  if (fromHost) return { tenantId: fromHost, source: 'platform-host' };
   const fixed = valid(options.fixedTenantId);
   return fixed ? { tenantId: fixed, source: 'fixed' } : null;
 }

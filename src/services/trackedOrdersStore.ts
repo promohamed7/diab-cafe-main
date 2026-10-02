@@ -19,12 +19,13 @@ export interface TrackedOrderItem {
 export interface TrackedOrder {
   tenantId: string;
   publicReference: string;
-  orderNumber: string;
+  /** Café order number once INBYTE Café created the order (null while awaiting the café). */
+  orderNumber: string | null;
   orderType: OrderType;
   tableLabel: string | null;
   paymentMethod: PaymentMethod;
-  /** Café's authoritative total at acknowledgement time. */
-  acknowledgedTotalCents: number;
+  /** Café's authoritative total if known at acknowledgement, otherwise the platform estimate. */
+  acknowledgedTotalCents: number | null;
   placedAt: string;
   items: TrackedOrderItem[];
 }
@@ -41,9 +42,9 @@ function isTracked(v: unknown, tenantId: string): v is TrackedOrder {
   return (
     o.tenantId === tenantId &&
     typeof o.publicReference === 'string' &&
-    typeof o.orderNumber === 'string' &&
+    (typeof o.orderNumber === 'string' || o.orderNumber === null) &&
     typeof o.orderType === 'string' &&
-    typeof o.acknowledgedTotalCents === 'number' &&
+    (typeof o.acknowledgedTotalCents === 'number' || o.acknowledgedTotalCents === null) &&
     Array.isArray(o.items)
   );
 }

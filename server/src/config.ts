@@ -1,3 +1,5 @@
+import { resolve } from 'node:path';
+
 // Server configuration from environment variables. Secrets (DATABASE_URL) live
 // only here, never in VITE_* variables or the browser bundle.
 
@@ -55,7 +57,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     cookieSecure: mode === 'production' ? true : env.COOKIE_SECURE === 'true',
     publicCorsOrigins: list(env.PUBLIC_CORS_ORIGINS),
     adminOrigins: list(env.ADMIN_ORIGINS),
-    staticDir: env.STATIC_DIR?.trim() || null,
+    staticDir: env.STATIC_DIR?.trim() ? resolve(env.STATIC_DIR.trim()) : null,
     siteUrlTemplate: env.SITE_URL_TEMPLATE?.trim() || '{origin}/t/{tenantId}/',
     connectorOfflineAfterSeconds: int(env.CONNECTOR_OFFLINE_AFTER_SECONDS, 90, 10, 3600),
     orderLeaseSeconds: int(env.ORDER_LEASE_SECONDS, 60, 5, 3600),

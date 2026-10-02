@@ -2,7 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import type { TenantConfig } from '../types/tenant';
 import type { TenantScope } from './tenantScope';
 import { appConfig } from '../config/env';
-import { resolveTenant } from './tenantResolver';
+import { resolveTenantAsync } from './tenantResolver';
 import { browserAreas, createScopedStorage } from './scopedStorage';
 import { isolateTenantSwitch } from './tenantSwitch';
 import { TenantConfigError } from './parseTenantConfig';
@@ -10,7 +10,7 @@ import { sanitizeStoredAttempt } from '../domain/checkoutAttempt';
 import { formatMoney } from '../domain/pricing';
 import { getMockControls } from '../integration';
 import { toCafeError } from '../integration/errors';
-import { loadTenantConfig } from '../services/tenantConfigService';
+import { loadTenantConfig, lookupTenantForHost } from '../services/tenantConfigService';
 import { purgeLegacyData } from '../services/storage';
 
 // Resolves which café this visit belongs to, loads its configuration and
@@ -103,20 +103,24 @@ export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   useEffect(() => {
     purgeLegacyData();
-    const resolved = resolveTenant(window.location, appConfig.tenant);
-    if (!resolved) {
-      setState({ status: 'unresolved' });
-      return;
-    }
-    const { tenantId } = resolved;
-    const areas = browserAreas();
-    const scope: TenantScope = { tenantId, storage: createScopedStorage(tenantId, areas) };
-
     let active = true;
+    let tenantId = '';
     setState({ status: 'loading' });
-    loadTenantConfig(tenantId)
+    resolveTenantAsync(window.location, appConfig.tenant, () => lookupTenantForHost())
+      .then((resolved) => {
+        if (!active) return null;
+        if (!resolved) {
+          setState({ status: 'unresolved' });
+          return null;
+        }
+        tenantId = resolved.tenantId;
+        bindDevHooks(tenantId);
+        return loadTenantConfig(tenantId);
+      })
       .then((tenant) => {
-        if (!active) return;
+        if (!active || !tenant) return;
+        const areas = browserAreas();
+        const scope: TenantScope = { tenantId, storage: createScopedStorage(tenantId, areas) };
         // Only once the café is confirmed: leaving another café on this origin drops
         // its cart, table and settled checkout (a mistyped URL must not clear them).
         isolateTenantSwitch(tenantId, areas, isUnresolvedAttempt);
@@ -133,23 +137,25 @@ export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     // Development mock only: console hooks bound to this tenant. The condition is a
     // build-time constant, so production bundles don't contain this code at all.
-    const mockBuild =
-      import.meta.env.VITE_CAFE_TRANSPORT === 'mock' ||
-      (import.meta.env.DEV && import.meta.env.VITE_CAFE_TRANSPORT !== 'http');
-    if (mockBuild) void getMockControls().then((controls) => {
-      if (!active || !controls) return;
-      const bind = (id: string): Record<string, unknown> => {
-        const out: Record<string, unknown> = { tenantId: id };
-        for (const [name, fn] of Object.entries(controls)) {
-          out[name] =
-            name === 'tenantIds' || name === 'reset'
-              ? fn
-              : (...args: unknown[]) => (fn as (...a: unknown[]) => unknown)(id, ...args);
-        }
-        return out;
-      };
-      (window as unknown as { __INBYTE_DEV_MOCK__?: unknown }).__INBYTE_DEV_MOCK__ = { ...bind(tenantId), forTenant: bind };
-    });
+    function bindDevHooks(tenantId: string): void {
+      const mockBuild =
+        import.meta.env.VITE_CAFE_TRANSPORT === 'mock' ||
+        (import.meta.env.DEV && import.meta.env.VITE_CAFE_TRANSPORT !== 'http');
+      if (mockBuild) void getMockControls().then((controls) => {
+        if (!active || !controls) return;
+        const bind = (id: string): Record<string, unknown> => {
+          const out: Record<string, unknown> = { tenantId: id };
+          for (const [name, fn] of Object.entries(controls)) {
+            out[name] =
+              name === 'tenantIds' || name === 'reset'
+                ? fn
+                : (...args: unknown[]) => (fn as (...a: unknown[]) => unknown)(id, ...args);
+          }
+          return out;
+        };
+        (window as unknown as { __INBYTE_DEV_MOCK__?: unknown }).__INBYTE_DEV_MOCK__ = { ...bind(tenantId), forTenant: bind };
+      });
+    }
 
     return () => {
       active = false;

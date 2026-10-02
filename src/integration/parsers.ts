@@ -16,6 +16,7 @@ import type {
   CafeOrderStatus,
   CafePaymentStatus,
   OrderAcknowledgement,
+  OrderDeliveryState,
   OrderStatusSnapshot,
   OrderType
 } from '../types/order.ts';
@@ -86,6 +87,19 @@ function safeImageUrl(v: unknown): string | null {
   } catch {
     return null;
   }
+}
+
+function optCents(v: unknown): number | null {
+  return typeof v === 'number' && Number.isSafeInteger(v) ? v : null;
+}
+
+/**
+ * An integration that answers synchronously (order number included) and sends
+ * no delivery state means the café already has the order.
+ */
+function deliveryState(v: unknown, orderNumber: string | null): OrderDeliveryState {
+  if (v === 'AWAITING_CAFE' || v === 'RECEIVED_BY_CAFE' || v === 'NOT_DELIVERED') return v;
+  return orderNumber ? 'RECEIVED_BY_CAFE' : 'AWAITING_CAFE';
 }
 
 function availability(v: unknown): AvailabilityHint {
@@ -174,14 +188,18 @@ export function parseResolvedTable(raw: unknown): ResolvedTable {
 
 export function parseAcknowledgement(raw: unknown): OrderAcknowledgement {
   const a = obj(raw);
+  const orderNumber = optStr(a.orderNumber);
+  const totalCents = optCents(a.totalCents);
   return {
     publicReference: str(a.publicReference),
-    orderNumber: str(a.orderNumber),
+    orderNumber,
     orderStatus: oneOf(a.orderStatus, ORDER_STATUSES),
     paymentStatus: oneOf(a.paymentStatus, PAYMENT_STATUSES),
-    subtotalCents: cents(a.subtotalCents ?? a.totalCents),
-    discountCents: cents(a.discountCents ?? 0),
-    totalCents: cents(a.totalCents),
+    deliveryState: deliveryState(a.deliveryState, orderNumber),
+    estimatedTotalCents: optCents(a.estimatedTotalCents),
+    subtotalCents: optCents(a.subtotalCents) ?? totalCents,
+    discountCents: totalCents === null ? null : optCents(a.discountCents) ?? 0,
+    totalCents,
     createdAt: optStr(a.createdAt),
     replayed: a.replayed === true
   };
@@ -189,15 +207,18 @@ export function parseAcknowledgement(raw: unknown): OrderAcknowledgement {
 
 export function parseStatusSnapshot(raw: unknown): OrderStatusSnapshot {
   const s = obj(raw);
+  const orderNumber = optStr(s.orderNumber);
   return {
     publicReference: str(s.publicReference),
-    orderNumber: str(s.orderNumber),
+    orderNumber,
     orderType: typeof s.orderType === 'string' && (ORDER_TYPES as readonly string[]).includes(s.orderType)
       ? (s.orderType as OrderType)
       : null,
     orderStatus: oneOf(s.orderStatus, ORDER_STATUSES),
     paymentStatus: oneOf(s.paymentStatus, PAYMENT_STATUSES),
-    totalCents: typeof s.totalCents === 'number' && Number.isSafeInteger(s.totalCents) ? s.totalCents : null,
+    deliveryState: deliveryState(s.deliveryState, orderNumber),
+    estimatedTotalCents: optCents(s.estimatedTotalCents),
+    totalCents: optCents(s.totalCents),
     rejectionReason: optStr(s.rejectionReason),
     updatedAt: optStr(s.updatedAt)
   };

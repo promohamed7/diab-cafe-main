@@ -84,30 +84,40 @@ export const CheckoutPage: React.FC = () => {
   if ((state.phase === 'RECEIVED' || state.phase === 'SUCCESS') && state.acknowledgement && state.trackedOrder) {
     const ack = state.acknowledgement;
     const status = ORDER_STATUS_PRESENTATION[ack.orderStatus];
+    const awaitingCafe = ack.deliveryState === 'AWAITING_CAFE';
+    const finalTotal = ack.totalCents !== null;
     return (
       <main className="page-content" style={{ paddingBottom: '6rem' }}>
         <div className="content-inner">
           <section className="checkout-result-card is-success" id="order-confirmation" aria-live="polite">
-            <span className="material-symbols-outlined checkout-result-icon" aria-hidden="true">mark_email_read</span>
-            <h1>وصل طلبك إلى الكافيه</h1>
-            <p className="checkout-result-sub">{status.description}</p>
+            <span className="material-symbols-outlined checkout-result-icon" aria-hidden="true">{awaitingCafe ? 'schedule_send' : 'mark_email_read'}</span>
+            <h1 id="confirmation-title" data-delivery={ack.deliveryState}>{awaitingCafe ? 'تم استلام طلبك — بانتظار الكافيه' : 'وصل طلبك إلى الكافيه'}</h1>
+            <p className="checkout-result-sub">
+              {awaitingCafe
+                ? 'طلبك محفوظ وفي الطريق إلى نظام الكافيه. سيظهر رقم الطلب والإجمالي النهائي بمجرد أن يستلمه الكافيه — تابع الحالة من صفحة التتبع.'
+                : status.description}
+            </p>
 
             <dl className="checkout-result-facts">
               <div>
                 <dt>رقم الطلب</dt>
-                <dd id="confirmation-order-number">{ack.orderNumber}</dd>
+                <dd id="confirmation-order-number">{ack.orderNumber ?? 'يصدر من الكافيه عند الاستلام'}</dd>
               </div>
               <div>
                 <dt>الحالة</dt>
                 <dd id="confirmation-order-status">{status.label}</dd>
               </div>
               <div>
-                <dt>الإجمالي (من الكافيه)</dt>
-                <dd id="confirmation-total">{money(ack.totalCents)}</dd>
+                <dt>{finalTotal ? 'الإجمالي (من الكافيه)' : 'الإجمالي التقديري'}</dt>
+                <dd id="confirmation-total">{money(finalTotal ? ack.totalCents : ack.estimatedTotalCents)}</dd>
               </div>
               <div>
                 <dt>طريقة الدفع</dt>
                 <dd>{paymentMethodLabel(state.trackedOrder.paymentMethod, state.trackedOrder.orderType)}</dd>
+              </div>
+              <div>
+                <dt>رقم التتبع</dt>
+                <dd id="confirmation-reference" dir="ltr">{ack.publicReference}</dd>
               </div>
               {state.trackedOrder.tableLabel && (
                 <div>

@@ -255,6 +255,7 @@ export const MenuPage: React.FC = () => {
                     <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '0.35rem' }}>
                       <h3 style={{ fontSize: '15.5px', fontWeight: 800, color: 'var(--on-surface)', lineHeight: 1.3 }}>{p.name}</h3>
                       {!orderable && <span className="product-unavailable-tag">غير متاح حالياً</span>}
+                      {orderable && p.isFeatured && <span className="product-featured-tag">مميز</span>}
                     </div>
                     {p.description && (
                       <p style={{ fontSize: '12px', color: 'var(--on-surface-variant)', lineHeight: 1.5, marginTop: '0.35rem' }}>{p.description}</p>

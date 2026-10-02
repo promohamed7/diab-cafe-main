@@ -70,8 +70,12 @@ export const OrderTrackingPage: React.FC = () => {
   const status = snapshot?.orderStatus ?? null;
   const presentation = status ? ORDER_STATUS_PRESENTATION[status] : null;
   const stepIndex = status ? progressIndex(status) : -1;
+  const delivery = snapshot?.deliveryState ?? (tracked.orderNumber ? 'RECEIVED_BY_CAFE' : 'AWAITING_CAFE');
+  const notDelivered = delivery === 'NOT_DELIVERED';
   const isStopped = status === 'REJECTED' || status === 'CANCELLED';
-  const totalCents = snapshot?.totalCents ?? tracked.acknowledgedTotalCents;
+  const finalTotal = snapshot?.totalCents ?? null;
+  const totalCents = finalTotal ?? snapshot?.estimatedTotalCents ?? tracked.acknowledgedTotalCents;
+  const orderNumber = snapshot?.orderNumber ?? tracked.orderNumber;
   const storePhone = tenant.contact.phone ?? index?.catalog.store.phone ?? null;
 
   return (
@@ -90,7 +94,7 @@ export const OrderTrackingPage: React.FC = () => {
                 className={`cat-chip ${o.publicReference === tracked.publicReference ? 'is-selected' : ''}`}
                 onClick={() => setSelectedRef(o.publicReference)}
               >
-                {o.orderNumber}
+                {o.orderNumber ?? o.publicReference.slice(-4)}
               </button>
             ))}
           </div>
@@ -100,8 +104,13 @@ export const OrderTrackingPage: React.FC = () => {
           <div className="order-tracking-main-col">
             <section className="tracking-header-card" aria-label="بيانات الطلب">
               <div className="tracking-top-meta">
-                <span className="tracking-order-number" id="track-order-number">{tracked.orderNumber}</span>
-                {presentation ? (
+                <span className="tracking-order-number" id="track-order-number">{orderNumber ?? 'بانتظار الكافيه'}</span>
+                {notDelivered ? (
+                  <div className="tracking-status-pill status-pill--rejected" id="track-status-pill" data-status="NOT_DELIVERED">
+                    <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>cloud_off</span>
+                    <span>لم يصل الطلب إلى الكافيه</span>
+                  </div>
+                ) : presentation ? (
                   <div className={`tracking-status-pill status-pill--${presentation.tone}`} id="track-status-pill" data-status={status ?? ''}>
                     <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>{presentation.icon}</span>
                     <span>{presentation.label}</span>
@@ -122,9 +131,23 @@ export const OrderTrackingPage: React.FC = () => {
                 <span id="track-order-date">{formatTime(tracked.placedAt, tenant.locale)}</span>
               </div>
 
-              {presentation && <p className="tracking-status-desc">{presentation.description}</p>}
+              {presentation && !notDelivered && delivery !== 'AWAITING_CAFE' && <p className="tracking-status-desc">{presentation.description}</p>}
 
-              {isStopped && (
+              {delivery === 'AWAITING_CAFE' && (
+                <div id="track-awaiting-cafe" className="inline-notice" role="status" style={{ marginTop: '0.75rem' }}>
+                  <span className="material-symbols-outlined" aria-hidden="true">schedule_send</span>
+                  <span>طلبك محفوظ وفي الطريق إلى نظام الكافيه. سيظهر رقم الطلب بمجرد أن يستلمه الكافيه.</span>
+                </div>
+              )}
+
+              {notDelivered && (
+                <div id="track-not-delivered" className="inline-notice is-error" role="alert" style={{ marginTop: '0.75rem' }}>
+                  <span className="material-symbols-outlined" aria-hidden="true">cloud_off</span>
+                  <span>لم يستلم الكافيه طلبك في الوقت المحدد، لذلك لم يتم تنفيذه ولن يُطلب منك أي دفع. يمكنك إعادة الطلب أو الاتصال بالكافيه.</span>
+                </div>
+              )}
+
+              {isStopped && !notDelivered && (
                 <div id="track-rejection-alert" className="inline-notice is-error" role="alert" style={{ marginTop: '0.75rem' }}>
                   <span className="material-symbols-outlined" aria-hidden="true">error</span>
                   <span>
@@ -149,7 +172,7 @@ export const OrderTrackingPage: React.FC = () => {
               </div>
             </section>
 
-            {!isStopped && (
+            {!isStopped && !notDelivered && (
               <section className="tracking-stepper-box" aria-label="مراحل الطلب">
                 {PROGRESS_STEPS.map((step, i) => (
                   <div
@@ -190,7 +213,7 @@ export const OrderTrackingPage: React.FC = () => {
 
               <div style={{ borderTop: '1px dashed rgba(var(--brand-deep-rgb), 0.2)', paddingTop: '0.65rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                 <div className="summary-row total-row">
-                  <span>الإجمالي (من الكافيه):</span>
+                  <span>{finalTotal !== null ? 'الإجمالي (من الكافيه):' : 'الإجمالي التقديري:'}</span>
                   <span id="track-total">{money(totalCents)}</span>
                 </div>
               </div>
