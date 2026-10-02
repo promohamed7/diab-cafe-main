@@ -1,27 +1,25 @@
 import React, { useEffect, useState } from 'react';
-import { useStore } from '../context/StoreContext';
+import { useUI } from '../context/UIContext';
+
+const TONE_ICON = { success: 'check_circle', error: 'error', info: 'info' } as const;
 
 export const Toast: React.FC = () => {
-  const { toastMessage } = useStore();
+  const { toast } = useUI();
   const [visible, setVisible] = useState(false);
-  const [currentText, setCurrentText] = useState('');
 
   useEffect(() => {
-    if (toastMessage) {
-      setCurrentText(toastMessage);
-      setVisible(true);
-      const timer = setTimeout(() => {
-        setVisible(false);
-      }, 2600);
-      return () => clearTimeout(timer);
-    }
-  }, [toastMessage]);
+    if (!toast) return;
+    setVisible(true);
+    const timer = setTimeout(() => setVisible(false), toast.tone === 'error' ? 4200 : 2600);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
-  if (!visible && !currentText) return null;
+  if (!toast) return null;
 
   return (
     <div
       className={`site-toast ${visible ? 'is-visible' : ''}`}
+      role={toast.tone === 'error' ? 'alert' : 'status'}
       style={{
         position: 'fixed',
         bottom: '5.5rem',
@@ -33,7 +31,7 @@ export const Toast: React.FC = () => {
         zIndex: 2200,
         background: 'rgba(26, 21, 18, 0.96)',
         color: '#F4EDE4',
-        border: '1px solid rgba(244, 189, 97, 0.35)',
+        border: `1px solid ${toast.tone === 'error' ? 'rgba(255, 180, 171, 0.55)' : 'rgba(244, 189, 97, 0.35)'}`,
         boxShadow: '0 12px 32px rgba(0, 0, 0, 0.65)',
         borderRadius: '9999px',
         padding: '0.65rem 1.25rem',
@@ -46,10 +44,13 @@ export const Toast: React.FC = () => {
         textAlign: 'center'
       }}
     >
-      <span className="material-symbols-outlined" style={{ color: 'var(--primary)', fontSize: '18px' }}>
-        check_circle
+      <span
+        className="material-symbols-outlined"
+        style={{ color: toast.tone === 'error' ? 'var(--error)' : 'var(--primary)', fontSize: '18px' }}
+      >
+        {TONE_ICON[toast.tone]}
       </span>
-      <span>{currentText}</span>
+      <span>{toast.text}</span>
     </div>
   );
 };

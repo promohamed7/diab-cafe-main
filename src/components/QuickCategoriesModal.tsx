@@ -1,9 +1,11 @@
 import React, { useState, useRef } from 'react';
-import { useStore } from '../context/StoreContext';
-import { CATEGORIES, PRODUCTS } from '../data/menuData';
+import { useUI } from '../context/UIContext';
+import { useCatalog } from '../hooks/useCatalog';
+import type { CatalogCategory } from '../types/catalog';
+import { categoryIcon } from './categoryIcon';
 
 interface TravelerState {
-  catId: string;
+  catId: number;
   name: string;
   icon: string;
   startCenterX: number;
@@ -17,10 +19,12 @@ export const QuickCategoriesModal: React.FC = () => {
   const {
     isQuickCatModalOpen,
     closeQuickCatModal,
-    setSelectedCategory,
+    setSelectedCategoryId,
     setActiveTab,
-    setAnimatingCategory
-  } = useStore();
+    setAnimatingCategoryId
+  } = useUI();
+  const { index } = useCatalog();
+  const categories = index?.categories ?? [];
 
   const [traveler, setTraveler] = useState<TravelerState | null>(null);
   const travelerElRef = useRef<HTMLDivElement | null>(null);
@@ -28,7 +32,7 @@ export const QuickCategoriesModal: React.FC = () => {
   if (!isQuickCatModalOpen && !traveler) return null;
 
   // Helper to query the live position of the target category chip (or category bar center)
-  const getLiveTargetCoords = (catId: string): { x: number; y: number } => {
+  const getLiveTargetCoords = (catId: number): { x: number; y: number } => {
     const targetChip = document.querySelector(`[data-cat-id="${catId}"]`) as HTMLElement;
     const stickyBar = document.getElementById('sticky-category-bar') as HTMLElement;
     const shimmerBtn = document.getElementById('btn-categories-shimmer') as HTMLElement;
@@ -69,7 +73,8 @@ export const QuickCategoriesModal: React.FC = () => {
     };
   };
 
-  const handleSelectCategory = (cat: typeof CATEGORIES[0], e: React.MouseEvent<HTMLButtonElement>) => {
+  const handleSelectCategory = (cat: CatalogCategory, e: React.MouseEvent<HTMLButtonElement>) => {
+    const icon = categoryIcon(cat.name);
     const cardEl = e.currentTarget;
     const cardRect = cardEl.getBoundingClientRect();
 
@@ -79,15 +84,15 @@ export const QuickCategoriesModal: React.FC = () => {
 
     // 2. Immediately close modal sheet and switch active category
     closeQuickCatModal();
-    setSelectedCategory(cat.id);
+    setSelectedCategoryId(cat.id);
     setActiveTab('menu');
-    setAnimatingCategory(cat.id);
+    setAnimatingCategoryId(cat.id);
 
     // 3. Initialize the floating category traveler
     const startObj: TravelerState = {
       catId: cat.id,
       name: cat.name,
-      icon: cat.icon,
+      icon,
       startCenterX,
       startCenterY,
       currentX: startCenterX,
@@ -119,7 +124,7 @@ export const QuickCategoriesModal: React.FC = () => {
       setTraveler({
         catId: cat.id,
         name: cat.name,
-        icon: cat.icon,
+        icon,
         startCenterX,
         startCenterY,
         currentX: curX,
@@ -172,7 +177,7 @@ export const QuickCategoriesModal: React.FC = () => {
         }
 
         setTimeout(() => {
-          setAnimatingCategory(null);
+          setAnimatingCategoryId(null);
         }, 500);
       }
     };
@@ -242,8 +247,8 @@ export const QuickCategoriesModal: React.FC = () => {
 
             {/* Category Cards Grid */}
             <div className="quick-cat-grid" id="quick-categories-list">
-              {CATEGORIES.map((cat) => {
-                const count = PRODUCTS.filter((p) => p.categoryId === cat.id).length;
+              {categories.map((cat) => {
+                const count = index?.productsByCategory.get(cat.id)?.length ?? 0;
                 return (
                   <button
                     key={cat.id}
@@ -252,7 +257,7 @@ export const QuickCategoriesModal: React.FC = () => {
                     onClick={(e) => handleSelectCategory(cat, e)}
                   >
                     <div className="quick-cat-card-icon">
-                      <span className="material-symbols-outlined">{cat.icon}</span>
+                      <span className="material-symbols-outlined">{categoryIcon(cat.name)}</span>
                     </div>
                     <div className="quick-cat-card-info">
                       <h4 className="quick-cat-card-name">{cat.name}</h4>

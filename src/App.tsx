@@ -1,12 +1,12 @@
 import React, { useEffect } from 'react';
-import { useStore } from './context/StoreContext';
+import { useUI } from './context/UIContext';
 import { Header } from './components/Header';
 import { BottomNav } from './components/BottomNav';
-import { TableSelectorModal } from './components/TableSelectorModal';
-import { AuthModal } from './components/AuthModal';
 import { ModifierModal } from './components/ModifierModal';
 import { QuickCategoriesModal } from './components/QuickCategoriesModal';
 import { Toast } from './components/Toast';
+import { DevMockBanner } from './components/DevMockBanner';
+import { TableSessionBanner } from './components/TableSessionBanner';
 
 import { HomeModePage } from './pages/HomeModePage';
 import { MenuPage } from './pages/MenuPage';
@@ -16,7 +16,7 @@ import { OrderTrackingPage } from './pages/OrderTrackingPage';
 import { HeritagePage } from './pages/HeritagePage';
 
 export const App: React.FC = () => {
-  const { activeTab } = useStore();
+  const { activeTab } = useUI();
 
   // Scroll to top whenever active tab changes
   useEffect(() => {
@@ -27,6 +27,11 @@ export const App: React.FC = () => {
     <>
       <div className="page-wrapper" id="app-wrapper">
         <Header />
+        {/* Clears the fixed header itself when it has content (see ordering.css). */}
+        <div className="ordering-banners">
+          <DevMockBanner />
+          <TableSessionBanner />
+        </div>
 
         {activeTab === 'home' && <HomeModePage />}
         {activeTab === 'menu' && <MenuPage />}
@@ -40,8 +45,6 @@ export const App: React.FC = () => {
       <BottomNav />
 
       {/* Interactive Global Modals */}
-      <TableSelectorModal />
-      <AuthModal />
       <ModifierModal />
       <QuickCategoriesModal />
       <Toast />

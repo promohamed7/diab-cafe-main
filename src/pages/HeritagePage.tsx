@@ -1,8 +1,11 @@
 import React from 'react';
-import { useStore } from '../context/StoreContext';
+import { useUI } from '../context/UIContext';
+import { useCatalog } from '../hooks/useCatalog';
 
 export const HeritagePage: React.FC = () => {
-  const { setActiveTab } = useStore();
+  const { setActiveTab } = useUI();
+  // Contact phone comes from Café's store settings; nothing is shown if Café doesn't publish one.
+  const storePhone = useCatalog().index?.catalog.store.phone ?? null;
 
   return (
     <main className="page-content">
@@ -218,14 +221,17 @@ export const HeritagePage: React.FC = () => {
                 <strong>ساعات العمل:</strong> يومياً من الساعة ٧:٠٠ صباحاً وحتى ٢:٠٠ صباحاً بعد منتصف الليل.
               </span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span className="material-symbols-outlined" style={{ color: 'var(--primary)' }}>
-                phone
-              </span>
-              <span>
-                <strong>هاتف وواتساب:</strong> 01012345678
-              </span>
-            </div>
+            {storePhone && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span className="material-symbols-outlined" style={{ color: 'var(--primary)' }}>
+                  phone
+                </span>
+                <span>
+                  <strong>هاتف:</strong>{' '}
+                  <a href={`tel:${storePhone}`} style={{ color: 'var(--primary)' }}>{storePhone}</a>
+                </span>
+              </div>
+            )}
           </div>
 
           <button

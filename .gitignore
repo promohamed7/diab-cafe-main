@@ -16,3 +16,6 @@ Desktop.ini
 # Editor directories
 .vscode/
 .idea/
+
+# Build output
+dist/

@@ -1,9 +1,11 @@
 import React from 'react';
-import { useStore } from '../context/StoreContext';
-import { NavigationTab } from '../types';
+import { useUI } from '../context/UIContext';
+import type { NavigationTab } from '../context/UIContext';
+import { useCart } from '../hooks/useCart';
 
 export const BottomNav: React.FC = () => {
-  const { activeTab, setActiveTab, cartCount } = useStore();
+  const { activeTab, setActiveTab } = useUI();
+  const { itemCount: cartCount } = useCart();
 
   const navItems: { tab: NavigationTab; label: string; icon: string; id: string }[] = [
     { tab: 'home', label: 'نوع الطلب', icon: 'room_service', id: 'nav-mode' },

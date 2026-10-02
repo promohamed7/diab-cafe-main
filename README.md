@@ -1,29 +1,35 @@
-# دياب كافيه — DIAB CAFE | Artisanal Roastery
+# دياب كافيه — DIAB CAFE | Digital Menu & Ordering
 
-منصة متكاملة وتجربة ويب تفاعلية لطلب القهوة والمنتجات الحرفية من محمصة دياب (Diab Artisanal Roastery).
+الموقع هو **منيو رقمي وقناة طلب للعملاء** متصلة بنظام نقاط البيع INBYTE Café.
+نظام الكافيه هو المرجع الوحيد للأسعار والمخزون وحالة الطلب والدفع؛ الموقع لا يعمل ككاشير.
 
-## المميزات الرئيسية
-- **أنماط الطلب المتعددة**:
-  - طلب من داخل الكافيه عبر مسح رمز الطاولة (QR Code) أو الإدخال اليدوي.
-  - استلام من الفرع (Takeaway).
-  - توصيل منزلي ومكتبي (Delivery).
-- **منيو تفاعلي فائق السرعة**:
-  - شريط أقسام سريع وانتقال ذكي بمؤثرات حركية فاخرة.
-  - شبكة منتجات مرنة مع دعم الشاشات الصغيرة (Two-Column Responsive Grid).
-  - نافذة تخصيص المشروبات وحبوب البن (Modifier Modal) بدرجات الطحن والتحويج والإضافات.
-- **تتبع مباشر لحالة الطلب (Live Order Tracking)**:
-  - مؤشر مراحل الطلب (قيد المراجعة ➔ تم القبول ➔ جاري التجهيز ➔ جاهز للتسليم).
-  - لوحة تحكم تفاعلية لمحاكاة شاشة الباريستا والكاشير (Barista Simulator).
-- **نظام حسابات ونقاط الولاء**:
-  - إدارة العناوين وطلب القهوة المعتادة بضغطة زر واحدة.
-  - دعم المظهر الليلي والفاتح (Dark / Light Theme).
+The website is a digital menu and customer ordering channel for INBYTE Café.
+The Café POS stays the system of record for prices, inventory, order status and payment.
 
-## تشغيل المشروع محلياً
-يمكن تشغيل خادم التطوير عبر Node.js:
+## Customer journeys
+- **Pickup / takeaway** — `ONLINE` + `PICKUP` (default for visitors).
+- **Delivery** — `ONLINE` + `DELIVERY`.
+- **Dine-in** — `TABLE_QR` + `DINE_IN`, only by scanning the Café table QR code
+  (`/?table=<Café token>`). There is no manual table selection.
+
+## Development
 ```bash
-node website/server.js
+npm install
+npm run dev          # http://localhost:3000 — uses the development mock (clearly bannered)
+npm test             # unit tests (Node ≥ 22.18, no extra dependencies)
+npm run typecheck
+npm run build        # static production build in dist/
+npm run verify       # typecheck + tests + build
 ```
-ثم فتح المتصفح على:
-```
-http://localhost:3000
-```
+
+Try dine-in locally: `http://localhost:3000/?table=qr_7c1e4b9a2f6d4e08`.
+
+## Production
+The output in `dist/` is a static site; host it on any static host. Configure
+`VITE_CAFE_API_BASE_URL` (see `.env.example`). Until INBYTE Café provides its
+integration adapter, a production build shows "online ordering unavailable"
+instead of accepting fake orders.
+
+See **[docs/WEBSITE_INTEGRATION.md](docs/WEBSITE_INTEGRATION.md)** for the
+integration contract, the `clientRequestId` lifecycle, the QR flow and the list
+of Café-side dependencies.
